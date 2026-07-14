@@ -1,25 +1,25 @@
-# PyForge
+# AI4SE_Coding_Agent_Harness
 
 A **Coding Agent Harness** — an engineering system that wraps an LLM into a reliable, feedback-driven coding agent. Built with Python.
 
 ## 项目状态
 
-🚧 初期搭建中 —— 见 `docs/superpowers/specs/` 获取设计文档。
+初期搭建中 —— 见 `docs/superpowers/specs/` 获取设计文档。
 
 ## 快速开始
 
 ```bash
 # 安装
-pip install pyforge
+pip install ai4se-agent
 
 # 运行
-pyforge run
+ai4se-agent run
 ```
 
 ## 目录结构
 
 ```
-src/pyforge/
+src/ai4se_agent/
 ├── core/        # Agent 主循环
 ├── tools/       # 工具系统（文件读写、shell 等）
 ├── feedback/    # 反馈闭环（重点维度）
@@ -34,5 +34,5 @@ src/pyforge/
 
 ## 分发
 
-- PyPI: `pip install pyforge`
+- PyPI: `pip install ai4se-agent`
 - [更多文档](docs/)

@@ -1,4 +1,4 @@
-# PyForge — Agent Workflow Conventions
+# AI4SE_Coding_Agent_Harness — Agent Workflow Conventions
 
 > 本项目使用 Superpowers 框架开发，遵循以下工作规约。
 
@@ -44,7 +44,7 @@ SPEC_PROCESS.md 记录 brainstorming 阶段的迭代过程。
 ## 6. 包结构规约
 
 ```
-src/pyforge/
+src/ai4se_agent/
 ├── core/        # Agent 主循环（组织上下文 → 调用 LLM → 解析动作 → 分发执行 → 回灌 → 停机）
 ├── tools/       # 工具注册与分发（文件读写、shell、自定义工具）
 ├── feedback/    # 反馈闭环（Validator → Classifier → Corrector）— 重点维度
