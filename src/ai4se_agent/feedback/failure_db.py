@@ -9,7 +9,8 @@ class FailureDB:
         self._init_db()
 
     def _init_db(self) -> None:
-        with sqlite3.connect(self._db_path) as conn:
+        conn = sqlite3.connect(self._db_path)
+        try:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS failure_patterns (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,19 +21,29 @@ class FailureDB:
                     last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            conn.commit()
+        finally:
+            conn.close()
 
     def record_failure(self, failure_type: str, pattern: str, fix_strategy: str = "") -> None:
-        with sqlite3.connect(self._db_path) as conn:
+        conn = sqlite3.connect(self._db_path)
+        try:
             conn.execute(
                 "INSERT INTO failure_patterns (failure_type, pattern, fix_strategy) VALUES (?, ?, ?)",
                 (failure_type, pattern, fix_strategy)
             )
+            conn.commit()
+        finally:
+            conn.close()
 
     def query_similar(self, failure_type: str) -> list[dict]:
-        with sqlite3.connect(self._db_path) as conn:
+        conn = sqlite3.connect(self._db_path)
+        try:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 "SELECT * FROM failure_patterns WHERE failure_type = ? ORDER BY count DESC LIMIT 5",
                 (failure_type,)
             )
             return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
