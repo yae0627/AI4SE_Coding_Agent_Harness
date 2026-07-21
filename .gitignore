@@ -45,3 +45,9 @@ coverage.xml
 # Runtime storage
 memory/
 *.db
+
+# Git worktrees
+.worktrees/
+
+# Subagent development artifacts
+.superpowers/

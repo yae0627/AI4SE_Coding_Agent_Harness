@@ -12,3 +12,17 @@
 | 2026-07-21 15:45 | #task-02 | infrastructure | 配置 CI/CD 流水线（GitHub Actions + .gitlab-ci.yml） | - | - |
 | 2026-07-21 15:46 | #task-02 | infrastructure | Verify AGENT_LOG and CI/CD setup | - | c2d4762 |
 | 2026-07-21 16:02 | #task-02 | git | Commit and push brainstorming output to remote | - | e627774 |
+| 2026-07-21 16:18 | #task-01 | types | Add shared types: Action, ToolResult, Feedback, GuardrailResult, CorrectionPlan, StopReason | - | fe93074 |
+| 2026-07-21 16:24 | #task-02 | agent-state | Add AgentState data model with record_turn and increment_iteration | - | bd3bb5e |
+| 2026-07-21 16:30 | #task-03 | llm-adapter | Add LLMAdapter abstraction with OpenAI and Mock adapters | - | f662f57 |
+| 2026-07-21 16:34 | #task-04 | action-parser | Add ActionParser and ActionValidator with regex parsing and schema validation | - | 13ffdc6 |
+| 2026-07-21 16:40 | #task-05 | tool-system | Add Tool system with registry and 5 core tools (read_file, write_file, edit_file, shell, run_test) | - | 857bffb |
+| 2026-07-21 16:46 | #task-06 | guardrails | Add Guardrail system with Command, File, Workspace, Git policies | - | 137d5f4 |
+| 2026-07-21 16:52 | #task-07 | memory | Add Memory system with session and persistent storage | - | 79c3bed |
+| 2026-07-21 16:57 | #task-08 | config | Add ConfigLoader with .env support | - | c8b2969 |
+| 2026-07-21 17:04 | #task-09 | feedback-loop | Add Feedback Loop with Sensor, Classifier, Planner, and FailureDB (重点维度) | - | c3818f0 |
+| 2026-07-21 17:18 | #task-10 | state-machine | Add HarnessStateMachine - 11-state FSM with transitions | - | 6d3320b |
+| 2026-07-21 17:29 | #task-11 | cli | Add CLI entry point and harness builder | - | 820c07a |
+| 2026-07-21 17:37 | #task-12 | demo | Add mechanism demo for guardrail, feedback, correction, failure DB, workspace policy | - | c0015a9 |
+| 2026-07-21 17:42 | #task-12 | fix | Fix FailureDB SQLite connection leak on Windows (explicit conn.close()) | Controller fix: pre-existing bug in failure_db.py | 2720ca1 |
+| 2026-07-21 17:50 | #task-finish | git | Push feat/core-shared-types and create PR on GitHub | - | 46e4cd1 |
