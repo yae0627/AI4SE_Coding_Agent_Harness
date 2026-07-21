@@ -45,3 +45,6 @@ coverage.xml
 # Runtime storage
 memory/
 *.db
+
+# Git worktrees
+.worktrees/
