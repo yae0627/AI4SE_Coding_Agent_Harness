@@ -24,7 +24,7 @@ def get_latest_commit() -> str:
     try:
         result = subprocess.run(
             ["git", "log", "--oneline", "-1"],
-            capture_output=True, text=True, check=True
+            capture_output=True, text=True, encoding="utf-8", check=True
         )
         return result.stdout.strip().split()[0]
     except (subprocess.CalledProcessError, FileNotFoundError, IndexError):
