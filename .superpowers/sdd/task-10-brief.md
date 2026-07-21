@@ -1,5 +1,58 @@
+# Task 10: State Machine + Integration
+
+**Files:**
+- Create: `src/ai4se_agent/core/state_machine.py`
+- Create: `tests/core/test_state_machine.py`
+
+**Interfaces:**
+- Consumes: All previous tasks (AgentState, LLMAdapter, ActionParser, ActionValidator, ToolRegistry, GuardrailEngine, FeedbackLoop, MemoryManager)
+- Produces: `HarnessStateMachine` — the main entry point
+
+## Step 1: Write the failing test
+
+```python
+# tests/core/test_state_machine.py
+from ai4se_agent.core.state_machine import HarnessStateMachine
+from ai4se_agent.core.agent_state import AgentState
+from ai4se_agent.llm.mock_adapter import MockAdapter
+from ai4se_agent.core.action import ActionParser, ActionValidator
+from ai4se_agent.tools.registry import ToolRegistry
+from ai4se_agent.guardrails.engine import GuardrailEngine
+from ai4se_agent.feedback.loop import FeedbackLoop
+from ai4se_agent.feedback.classifier import FailureClassifier
+from ai4se_agent.feedback.planner import CorrectionPlanner
+from ai4se_agent.feedback.sensor import TestSensor
+from ai4se_agent.memory.manager import MemoryManager
+
+def test_state_machine_completes_successfully(tmp_path):
+    llm = MockAdapter(responses=["action: read_file path=test.txt", "[DONE]"])
+    registry = ToolRegistry()
+    guardrails = GuardrailEngine()
+    state = AgentState(goal="test task")
+    machine = HarnessStateMachine(
+        agent_state=state,
+        llm_adapter=llm,
+        action_parser=ActionParser(),
+        action_validator=ActionValidator(),
+        tool_registry=registry,
+        guardrail_engine=guardrails,
+        feedback_loop=None,
+        memory_manager=MemoryManager(),
+        max_iterations=5
+    )
+    result = machine.run()
+    assert result["status"] in ("success", "failed")
+```
+
+## Step 2: Run test
+
+Run: `pytest tests/core/test_state_machine.py -v`
+Expected: FAIL
+
+## Step 3: Write minimal implementation
+
+```python
 # src/ai4se_agent/core/state_machine.py
-from typing import Any, Optional
 from transitions import Machine
 from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.core.action import ActionParser, ActionValidator
@@ -8,7 +61,7 @@ from ai4se_agent.tools.registry import ToolRegistry
 from ai4se_agent.guardrails.engine import GuardrailEngine
 from ai4se_agent.feedback.loop import FeedbackLoop
 from ai4se_agent.memory.manager import MemoryManager
-from ai4se_agent.types import Action, GuardrailResult, ToolResult, StopReason
+from ai4se_agent.types import GuardrailResult, StopReason
 
 
 class HarnessStateMachine:
@@ -17,9 +70,6 @@ class HarnessStateMachine:
         "GUARDRAIL", "WAIT_APPROVAL", "TOOL_EXEC", "TOOL_ERROR",
         "FEEDBACK", "MEMORY_UPDATE", "STOP"
     ]
-
-    def __getattr__(self, name: str) -> Any:
-        ...
 
     def __init__(
         self,
@@ -43,16 +93,14 @@ class HarnessStateMachine:
         self.memory = memory_manager
         self.max_iterations = max_iterations
         self.stop_reason = StopReason.SUCCESS
-        self._pending_action: Optional[Action] = None
-        self._pending_guardrail: Optional[GuardrailResult] = None
-        self._last_tool_result: Optional[ToolResult] = None
+        self._pending_action = None
+        self._pending_guardrail = None
 
         self.machine = Machine(
             model=self,
             states=HarnessStateMachine.states,
             initial="IDLE",
             auto_transitions=False,
-            model_attribute="_fsm_state",
         )
 
         self.machine.add_transition("start", "IDLE", "CONTEXT_ORG", after="_on_context_org")
@@ -72,10 +120,11 @@ class HarnessStateMachine:
         self.machine.add_transition("feedback_done", "FEEDBACK", "MEMORY_UPDATE", after="_on_memory_update")
         self.machine.add_transition("feedback_correct", "FEEDBACK", "CONTEXT_ORG", after="_on_context_org")
         self.machine.add_transition("continue_loop", "MEMORY_UPDATE", "CONTEXT_ORG", after="_on_context_org")
-        self.machine.add_transition("stop", "*", "STOP")
+        self.machine.add_transition("stop", "MEMORY_UPDATE", "STOP")
 
     def run(self) -> dict:
         self.start()
+        self.state.current_state = self.state
         return self._build_result()
 
     def _on_context_org(self) -> None:
@@ -118,7 +167,6 @@ class HarnessStateMachine:
         self.check_guardrails()
 
     def _on_guardrail(self) -> None:
-        assert self._pending_action is not None
         result = self.guardrails.check(self._pending_action)
         self._pending_guardrail = result
         if result.verdict == "DENY":
@@ -129,8 +177,6 @@ class HarnessStateMachine:
             self.execute()
 
     def _on_wait_approval(self) -> None:
-        assert self._pending_action is not None
-        assert self._pending_guardrail is not None
         print(f"\n[DANGEROUS ACTION] Policy: {self._pending_guardrail.policy}")
         print(f"Reason: {self._pending_guardrail.reason}")
         print(f"Action: {self._pending_action}")
@@ -141,9 +187,7 @@ class HarnessStateMachine:
             self.reject()
 
     def _on_tool_exec(self) -> None:
-        assert self._pending_action is not None
         result = self.tools.execute(self._pending_action)
-        self._last_tool_result = result
         if result.success:
             self.tool_success()
         else:
@@ -158,9 +202,8 @@ class HarnessStateMachine:
             self.stop()
 
     def _on_feedback(self) -> None:
-        assert self._last_tool_result is not None
         if self.feedback:
-            plan = self.feedback.run(self._last_tool_result, self.state.retry_count)
+            plan = self.feedback.run(None, self.state.retry_count)
             if plan:
                 self.state.retry_count += 1
                 if self.state.retry_count >= 3:
@@ -178,3 +221,26 @@ class HarnessStateMachine:
             "reason": self.stop_reason.value,
             "iterations": self.state.iteration,
         }
+```
+
+## Step 4: Run tests
+
+Run: `pytest tests/core/test_state_machine.py -v`
+Expected: PASS
+
+## Step 5: Commit
+
+```bash
+git add src/ai4se_agent/core/state_machine.py tests/core/test_state_machine.py
+git commit -m "feat: add HarnessStateMachine - 11-state FSM with transitions"
+```
+
+## Global Constraints
+
+- Python >=3.10
+- transitions (state machine, not an agent framework)
+- All core mechanisms must be testable with mock LLM (no network, no real LLM)
+- No use of agent orchestration frameworks
+- Tests in `tests/` mirroring `src/` structure
+- No comments in code unless specified
+- Lint must pass (ruff)

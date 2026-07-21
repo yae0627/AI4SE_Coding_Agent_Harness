@@ -3,14 +3,14 @@ from ai4se_agent.types import Action, GuardrailResult
 
 
 class GuardrailEngine:
-    def __init__(self):
+    def __init__(self) -> None:
         self._policies: list[Policy] = []
 
     def add_policy(self, policy: Policy) -> None:
         self._policies.append(policy)
 
     def check(self, action: Action) -> GuardrailResult:
-        results = []
+        results: list[GuardrailResult] = []
         for policy in self._policies:
             result = policy.check(action)
             if result is not None:

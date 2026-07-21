@@ -27,4 +27,4 @@ class ConfigLoader:
         return os.environ.get(env_key, default)
 
     def get_provider(self) -> str:
-        return self.get("provider", "openai")
+        return self.get("provider") or "openai"
