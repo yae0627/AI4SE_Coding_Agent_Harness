@@ -41,6 +41,7 @@ class HarnessStateMachine:
         self.stop_reason = StopReason.SUCCESS
         self._pending_action = None
         self._pending_guardrail = None
+        self._last_tool_result = None
 
         self.machine = Machine(
             model=self,
@@ -135,6 +136,7 @@ class HarnessStateMachine:
 
     def _on_tool_exec(self) -> None:
         result = self.tools.execute(self._pending_action)
+        self._last_tool_result = result
         if result.success:
             self.tool_success()
         else:
@@ -150,7 +152,7 @@ class HarnessStateMachine:
 
     def _on_feedback(self) -> None:
         if self.feedback:
-            plan = self.feedback.run(None, self.state.retry_count)
+            plan = self.feedback.run(self._last_tool_result, self.state.retry_count)
             if plan:
                 self.state.retry_count += 1
                 if self.state.retry_count >= 3:
