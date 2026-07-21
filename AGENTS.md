@@ -19,48 +19,112 @@ brainstorming → writing-plans → using-git-worktrees → subagent-driven-deve
 - 核心机制必须有 mock/stub LLM 的确定性单元测试，不依赖网络和真实 LLM
 - 所有测试通过才能标记 task 完成
 
-## 4. AGENT_LOG 记录格式
+## 4. AGENT_LOG 自动记录（强制）
 
-每条记录包含：
+**每完成一个 task，必须自动追加一条记录到 AGENT_LOG.md**，不允许事后补记。
+
+### 记录格式
+
+每条记录占比一行：
 
 ```
-| 2026-07-14 | #task-01 | brainstorming | 初始化项目骨架 | - | af7f7e7 |
+| 2026-07-21 14:30 | #task-03 | llm-adapter | Add LLMAdapter abstraction | - | a1b2c3d |
 ```
 
-| 列 | 内容 |
-|----|------|
-| 时间 | YYYY-MM-DD HH:mm |
-| Task | `#task-N` 编号 |
-| 技能 | 触发的 Superpowers 技能名 |
-| 摘要 | 做了什么、关键决策 |
-| 人工干预 | 修改了什么、为什么 |
-| Commit | 对应 commit hash |
+| 列 | 内容 | 自动/手动 |
+|----|------|----------|
+| 时间 | `YYYY-MM-DD HH:mm` | 自动 |
+| Task | `#task-N` + 简短标签 | 手动 |
+| 技能 | 触发的 Superpowers 技能名 | 手动 |
+| 摘要 | 做了什么、关键决策（≤50 字） | 手动 |
+| 人工干预 | 修改了什么、为什么；无干预则 `-` | 手动 |
+| Commit | 对应 commit hash（截取前 7 位） | 自动 |
 
-## 5. 决策记录
+### 自动记录命令
 
-重要决策（技术选型、架构变更）记录在 `AGENT_LOG.md` 和 `SPEC_PROCESS.md` 中。
-SPEC_PROCESS.md 记录 brainstorming 阶段的迭代过程。
+每个 task 完成后，用以下命令追加记录：
 
-## 6. 包结构规约
+```bash
+python scripts/log_agent.py "#task-03" "llm-adapter" "Add LLMAdapter abstraction with OpenAI/Mock adapters" "-"
+```
+
+该脚本自动读取最新 commit hash 并写入 AGENT_LOG.md。
+
+### 示例记录
+
+```
+| 2026-07-14 22:00 | #task-01 | brainstorming | 初始化项目骨架 | - | e9f9422 |
+| 2026-07-21 15:00 | #task-02 | brainstorming | 完成 11 状态 FSM 设计 | 采纳 Agent 建议增加 WAIT_APPROVAL 和 TOOL_ERROR 状态 | - |
+```
+
+## 5. AGENT_LOG 记录规则
+
+- 每个 task 完成且 commit 后**立即**追加
+- Subagent 完成 task 后，在 commit message 中注明 `(subagent: <name>)`，并在 commit 后运行 `log_agent.py`
+- 人工干预列必须诚实记录：修改了接口签名、重构了代码、修正了 bug 等
+- 决策记录：重要决策（技术选型、架构变更）同时记录在 AGENT_LOG.md 和 SPEC_PROCESS.md 中
+
+## 6. CI/CD 纪律
+
+- 每次 push 后，CI 自动运行 `pytest` 测试
+- 所有测试通过才能合并 PR
+- CI 配置见 `.github/workflows/ci.yml` 和 `.gitlab-ci.yml`
+
+## 7. 包结构规约
 
 ```
 src/ai4se_agent/
-├── core/        # Agent 主循环（组织上下文 → 调用 LLM → 解析动作 → 分发执行 → 回灌 → 停机）
-├── tools/       # 工具注册与分发（文件读写、shell、自定义工具）
-├── feedback/    # 反馈闭环（Validator → Classifier → Corrector）— 重点维度
-├── guardrails/  # 安全护栏（危险动作识别、HITL 状态机）
-├── memory/      # 记忆系统（跨会话存储与检索）
-└── config/      # 配置管理（凭据、规则、声明式配置）
+├── __init__.py
+├── types.py              # 共享类型
+├── cli.py                # CLI 入口
+├── config/
+│   └── loader.py         # 配置加载
+├── core/
+│   ├── agent_state.py    # AgentState
+│   ├── action.py         # ActionParser + ActionValidator
+│   └── state_machine.py  # 11 状态 FSM
+├── llm/
+│   ├── base.py           # LLMAdapter ABC
+│   ├── openai_adapter.py
+│   ├── local_adapter.py
+│   └── mock_adapter.py
+├── tools/
+│   ├── base.py           # Tool ABC
+│   ├── registry.py
+│   ├── read_file.py
+│   ├── write_file.py
+│   ├── edit_file.py
+│   ├── shell.py
+│   └── run_test.py
+├── guardrails/
+│   ├── base.py           # Policy ABC
+│   ├── engine.py
+│   ├── command_policy.py
+│   ├── file_policy.py
+│   ├── workspace_policy.py
+│   └── git_policy.py
+├── feedback/
+│   ├── loop.py           # FeedbackLoop 编排器
+│   ├── sensor.py         # Sensor ABC + Test/Lint/TypeSensor
+│   ├── classifier.py     # FailureClassifier（规则驱动）
+│   ├── planner.py        # CorrectionPlanner
+│   └── failure_db.py     # FailureDB (SQLite)
+└── memory/
+    ├── manager.py
+    ├── session.py        # 运行时记忆
+    └── persistent.py     # 持久化记忆
 ```
 
-## 7. 凭据安全
+## 8. 凭据安全
 
-- 所有 API Key 通过操作系统钥匙串或加密文件存储
-- 绝不硬编码进源码，绝不提交 Git
+- 所有 API Key 通过 `.env` 文件存储，`getpass` 隐藏输入引导
+- `.env` 已加入 `.gitignore`，绝不提交 Git
 - 绝不写入日志或终端历史
 
-## 8. 测试约定
+## 9. 测试约定
 
 - 测试文件命名：`test_<模块名>.py`
+- 测试目录结构：`tests/` 镜像 `src/` 结构
 - mock LLM 放在 `tests/fixtures/` 下
 - 运行测试：`pytest` 或 `python -m pytest`
+- 每个 task 的测试必须**先写失败测试（红）→ 实现通过（绿）→ 再重构**

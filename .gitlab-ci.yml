@@ -1,0 +1,18 @@
+stages:
+  - test
+
+unit-test:
+  stage: test
+  image: python:3.10-slim
+  before_script:
+    - cd projects
+    - pip install -e ".[dev]"
+    - pip install ruff mypy
+  script:
+    - cd projects
+    - ruff check src/ tests/
+    - mypy src/ --ignore-missing-imports
+    - python -m pytest -v --tb=short
+  only:
+    - main
+    - /^feat\/.*$/
