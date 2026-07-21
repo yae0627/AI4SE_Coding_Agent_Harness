@@ -43,8 +43,11 @@ coverage.xml
 *.agent-log.json
 
 # Runtime storage
-/memory/
+memory/
 *.db
 
 # Git worktrees
 .worktrees/
+
+# Subagent development artifacts
+.superpowers/
