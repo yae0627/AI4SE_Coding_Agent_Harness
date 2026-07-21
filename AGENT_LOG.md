@@ -26,3 +26,6 @@
 | 2026-07-21 17:37 | #task-12 | demo | Add mechanism demo for guardrail, feedback, correction, failure DB, workspace policy | - | c0015a9 |
 | 2026-07-21 17:42 | #task-12 | fix | Fix FailureDB SQLite connection leak on Windows (explicit conn.close()) | Controller fix: pre-existing bug in failure_db.py | 2720ca1 |
 | 2026-07-21 17:50 | #task-finish | git | Push feat/core-shared-types and create PR on GitHub | - | 46e4cd1 |
+| 2026-07-21 17:55 | #task-finish | mypy | Fix 39 mypy type errors across 5 files | 添加 __getattr__、Optional 类型标注、assert 守卫 | a9a1a89 |
+| 2026-07-21 17:56 | #task-finish | chore | Gitignore .superpowers/ review artifacts | - | 0697d5f |
+| 2026-07-21 18:00 | #task-finish | git | Merge PR to main, sync local, delete branch | - | 2ee2952 |

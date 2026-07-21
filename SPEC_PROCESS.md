@@ -52,4 +52,46 @@
 ### 产出文件
 
 - `docs/superpowers/specs/2026-07-21-coding-agent-harness-design.md` — SPEC 设计文档
-- 待生成：`PLAN.md` — 实现计划（下一阶段）
+- `docs/superpowers/plans/2026-07-21-coding-agent-harness-plan.md` — PLAN 实现计划
+
+## 阶段三：实现 — Subagent-Driven Development（2026-07-21）
+
+### 任务执行概览
+
+12 个 Task 按 PLAN.md 顺序执行，Tasks 2-9 可并行，实际按顺序串行实现以简化 review 流程。
+
+| Task | 模块 | 文件数 | 测试数 | Commit |
+|------|------|--------|--------|--------|
+| 1 | Shared Types | 2 | 6 | fe93074 |
+| 2 | AgentState | 2 | 3 | bd3bb5e |
+| 3 | LLMAdapter | 6 | 3 | f662f57 |
+| 4 | ActionParser | 2 | 3 | 13ffdc6 |
+| 5 | Tool System | 13 | 9 | 857bffb |
+| 6 | Guardrail System | 11 | 8 | 137d5f4 |
+| 7 | Memory System | 6 | 5 | 79c3bed |
+| 8 | Config | 2 | 2 | c8b2969 |
+| 9 | Feedback Loop | 10 | 7 | c3818f0 |
+| 10 | State Machine | 2 | 1 | 6d3320b |
+| 11 | CLI Entry Point | 2 | 1 | 820c07a |
+| 12 | Mechanism Demo | 2 | 5 demos | c0015a9 |
+
+### 实现中发现并修复的 Bug
+
+| Bug | 发现环节 | 修复方式 | Commit |
+|-----|---------|---------|--------|
+| `shell.py` 未使用的 `shlex` 导入 (F401) | Task 5 实现 | 删除 import | 5308950 |
+| `memory/` gitignore 规则未锚定，阻塞 src 提交 | Task 7 实现 | 改为 `/memory/` | f7af73b |
+| `transitions` 库 `self.state` 与 `model_attribute` 冲突 | Task 10 实现 | 添加 `model_attribute="_fsm_state"` | 6d3320b |
+| `stop` 转换仅允许从 MEMORY_UPDATE 状态调用 | Task 10 实现 | 改为通配符 `"*"` | 6d3320b |
+| `FailureDB` SQLite 连接未关闭，Windows 文件锁 | Task 12 审查 | 添加 `try/finally: conn.close()` | 2720ca1 |
+| FeedbackLoop 接收 `None` 而非 `ToolResult` | 全分支审查 | 存储 `_last_tool_result` 并传递 | 46e4cd1 |
+| 39 个 mypy 类型错误 | 最终验证 | 添加 `__getattr__`、`Optional`、`assert` 守卫 | a9a1a89 |
+
+### 最终交付物
+
+- **源代码**: 64 个文件，1432 行新增
+- **测试**: 48 个单元测试，全部通过
+- **类型检查**: mypy 零错误（38 个源文件）
+- **Lint**: ruff 全部通过
+- **CI/CD**: GitHub Actions + .gitlab-ci.yml 配置完成
+- **机制演示**: 5 个 demo 脚本，覆盖护栏拦截、反馈闭环、增量修正、FailureDB、路径逃逸防护
