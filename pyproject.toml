@@ -13,6 +13,7 @@ requires-python = ">=3.10"
 dependencies = [
     "openai>=1.0.0",
     "transitions>=0.9.0",
+    "colorama>=0.4.6",
 ]
 
 [project.optional-dependencies]
@@ -24,7 +25,7 @@ dev = [
 ]
 
 [project.scripts]
-ai4se-agent = "ai4se_agent.cli:main"
+ai4se-agent = "ai4se_agent.cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
