@@ -1,5 +1,5 @@
 # tests/observability/test_events.py
-from ai4se_agent.observability.events import EventType, Event, StateEvent, LLMEvent, ActionEvent
+from ai4se_agent.observability.events import EventType, StateEvent, LLMEvent
 
 def test_event_type_values():
     assert EventType.STATE_CHANGED.value == "state_changed"
