@@ -36,5 +36,12 @@
 | 2026-07-22 15:50 | #task-13 | verify | 53 个测试通过，mypy 零错误（42 文件），ruff 零告警，真实 API 端到端验证 success | - | - |
 | 2026-07-22 16:30 | #task-14 | brainstorming | 设计 Lightweight Observable CLI 表现层方案：Renderer 抽象 + SessionManager + Tracer | 用户要求不引入 emoji，采用 [STATE] 格式；不引入 rich/prompt_toolkit | - |
 | 2026-07-22 16:45 | #task-14 | writing-plans | 生成 5-Task 实现计划（observability → renderer → session → integration → build） | 用户选择方案 A+（轻量交互式 + 部分可视化能力） | - |
+| 2026-07-22 17:00 | #task-15 | subagent-driven | Task 1: observability/ — Events + Tracer（6 个测试） | - | 2559e4c |
+| 2026-07-22 17:10 | #task-15 | subagent-driven | Task 2: cli/renderer.py — Renderer ABC + NullRenderer + TerminalRenderer（3 个测试） | cli/__init__.py 添加 importlib shim 兼容旧 cli.py，Task 3 清理 | 361ce5d |
+| 2026-07-22 17:20 | #task-15 | subagent-driven | Task 3: cli/session.py + commands.py + main.py — SessionManager + 交互命令 + 入口（6 个测试），删除旧 cli.py | - | 60cae73 |
+| 2026-07-22 17:30 | #task-15 | subagent-driven | Task 4: state_machine.py 集成 Renderer/Tracer 回调（1 个测试） | on_stop 回调移入 FSM stop 转移，避免双重调用 | e1e761c |
+| 2026-07-22 17:35 | #task-15 | subagent-driven | Task 5: pyproject.toml 更新入口点 + colorama 依赖 | - | 9187fd8 |
+| 2026-07-22 17:40 | #task-15 | fix | ActionParser 修复：剥离参数值中的引号 | 真实 API 测试暴露：LLM 返回 command="dir" 带引号 | 28c9949 |
+| 2026-07-22 17:45 | #task-15 | verify | 69 个测试通过，mypy 零错误（49 文件），ruff 零告警，真实 API 端到端验证通过 | - | - |
 | 2026-07-22 22:46 | #task-03 | executing-plans | Add CLI layer SessionManager, interactive mode, commands; delete old cli.py | - | 60cae73 |
 | 2026-07-22 22:57 | #task-04 | executing-plans | Integrate Renderer/Tracer into StateMachine callbacks; pass from SessionManager | Removed redundant on_stop in session.submit (now handled by FSM _on_stop) | e677820 |
