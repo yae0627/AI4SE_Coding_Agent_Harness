@@ -141,7 +141,6 @@ class HarnessStateMachine:
             self.retry_parse()
             return
         self._pending_action = action
-        self._renderer.on_action(self.state.iteration, action, None)
         self._tracer.record(
             ActionEvent(self.state.iteration, action.name, action.params)
         )
