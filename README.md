@@ -6,16 +6,23 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 
 ## 项目状态
 
-✅ **已完成** — 12 个 Task 全部实现，48 个测试通过，mypy 零错误。
+✅ **已完成** — 69 个测试通过，mypy 零错误，真实 API 端到端验证通过。
 
 ## 架构
 
 ```
 src/ai4se_agent/
 ├── types.py              # 共享类型（Action, ToolResult, Feedback, GuardrailResult 等）
-├── cli.py                # CLI 入口
+├── cli/
+│   ├── main.py           # CLI 入口（argparse）
+│   ├── session.py        # SessionManager：交互循环、会话管理
+│   ├── renderer.py       # Renderer ABC + TerminalRenderer + NullRenderer
+│   └── commands.py       # 交互命令（/status, /reset, /verbose）
 ├── config/
 │   └── loader.py         # 配置加载（.env 支持）
+├── context/
+│   ├── builder.py        # ContextBuilder：动态组装 LLM 输入
+│   └── prompt.py         # system prompt 模板（工具列表动态注入）
 ├── core/
 │   ├── agent_state.py    # AgentState 数据模型
 │   ├── action.py         # ActionParser + ActionValidator
@@ -23,7 +30,7 @@ src/ai4se_agent/
 ├── llm/
 │   ├── base.py           # LLMAdapter ABC
 │   ├── openai_adapter.py # OpenAI 适配器
-│   ├── local_adapter.py  # 本地模型适配器（预留）
+│   ├── local_adapter.py  # 本地模型适配器（OpenAI 兼容）
 │   └── mock_adapter.py   # Mock 适配器（测试用）
 ├── tools/
 │   ├── base.py           # Tool ABC
@@ -46,10 +53,13 @@ src/ai4se_agent/
 │   ├── planner.py        # CorrectionPlanner
 │   ├── failure_db.py     # FailureDB (SQLite)
 │   └── loop.py           # FeedbackLoop 编排器
-└── memory/
-    ├── manager.py        # 记忆管理器
-    ├── session.py        # 运行时记忆（deque）
-    └── persistent.py     # 持久化记忆（文件存储）
+├── memory/
+│   ├── manager.py        # 记忆管理器
+│   ├── session.py        # 运行时记忆（deque）
+│   └── persistent.py     # 持久化记忆（文件存储）
+└── observability/
+    ├── events.py          # 事件类型（STATE_CHANGED, LLM_CALLED 等）
+    └── tracer.py          # Tracer：JSON trace 记录与回放
 ```
 
 ## 状态机
@@ -70,20 +80,59 @@ pip install -e ".[dev]"
 
 # 配置 API Key（首次运行）
 cp .env.example .env
-# 编辑 .env 填入你的 OPENAI_API_KEY
+# 编辑 .env 填入你的 OPENAI_API_KEY 和 OPENAI_MODEL
+```
 
-# 运行
+### 单次任务模式
+
+```bash
+# 运行单次任务
 ai4se-agent "你的任务描述"
 
-# 或使用 Mock 模式（无需真实 LLM）
-set LLM_PROVIDER=mock
-ai4se-agent "测试任务"
+# 查看详细输出（LLM 请求/响应、工具结果）
+ai4se-agent --verbose "你的任务描述"
+
+# 保存 JSON trace 到 sessions/ 目录
+ai4se-agent --trace "你的任务描述"
+
+# 使用 Mock 模式（无需真实 LLM，体验流程）
+ai4se-agent --provider mock "测试任务"
+```
+
+### 交互式会话模式
+
+```bash
+# 无参数启动交互模式
+ai4se-agent
+```
+
+交互模式支持以下命令：
+
+| 命令 | 用途 |
+|------|------|
+| `你的任务描述` | 提交任务给 agent |
+| `/status` | 查看当前状态和迭代次数 |
+| `/verbose` | 切换详细输出模式 |
+| `/reset` | 清空当前会话 |
+| `exit` / `quit` | 退出交互模式 |
+
+### 输出示例
+
+```
+[CONTEXT_ORG] Iteration 1
+  action: shell({'command': 'pytest'})
+  guardrail: all -> ALLOW
+  result: OK
+  feedback: success
+[CONTEXT_ORG] Iteration 2
+STOP: success after 2 iterations
+Result: success (success) after 2 iterations
 ```
 
 ## 运行测试
 
 ```bash
-pytest -v           # 48 个测试
+pytest -v           # 69 个测试
 mypy src/           # 类型检查
 ruff check src/     # Lint 检查
 ```
@@ -136,6 +185,7 @@ Sensor (TestSensor / LintSensor / TypeSensor)
 | 测试 | pytest |
 | Lint | ruff |
 | 类型检查 | mypy |
+| CLI | colorama |
 | CI/CD | GitHub Actions + .gitlab-ci.yml |
 
 ## 分发
@@ -143,6 +193,7 @@ Sensor (TestSensor / LintSensor / TypeSensor)
 - PyPI: `pip install ai4se-agent`
 - [设计文档](docs/superpowers/specs/2026-07-21-coding-agent-harness-design.md)
 - [实现计划](docs/superpowers/plans/2026-07-21-coding-agent-harness-plan.md)
+- [CLI 表现层设计](docs/superpowers/specs/2026-07-22-observable-cli-design.md)
 
 ## 项目课程
 
