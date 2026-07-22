@@ -1,8 +1,11 @@
-# tests/test_cli.py
-from ai4se_agent.cli import build_harness
+from ai4se_agent.cli.renderer import NullRenderer
+from ai4se_agent.cli.session import SessionManager
+from ai4se_agent.observability.tracer import NullTracer
 
-def test_build_harness_creates_machine(monkeypatch):
+
+def test_session_submit_with_mock(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "mock")
-    harness = build_harness("test task", workspace="/tmp")
-    assert harness is not None
-    assert harness.state.goal == "test task"
+    session = SessionManager(renderer=NullRenderer(), tracer=NullTracer())
+    result = session.submit("test task")
+    assert result is not None
+    assert "status" in result
