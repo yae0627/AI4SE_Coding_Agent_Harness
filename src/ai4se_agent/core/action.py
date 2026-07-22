@@ -11,8 +11,10 @@ class ActionParser:
         name = match.group(1)
         params_str = match.group(2).strip()
         params = {}
-        for pair in re.findall(r'(\w+)=(\S+)', params_str):
-            params[pair[0]] = pair[1]
+        for pair in re.findall(r'(\w+)=(?:"([^"]*)"|\'([^\']*)\'|(.+?)(?=\s+\w+=|$))', params_str):
+            value = (pair[1] or pair[2] or pair[3]).strip()
+            if value:
+                params[pair[0]] = value
         return Action(name=name, params=params)
 
 
