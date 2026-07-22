@@ -36,3 +36,5 @@
 | 2026-07-22 15:50 | #task-13 | verify | 53 个测试通过，mypy 零错误（42 文件），ruff 零告警，真实 API 端到端验证 success | - | - |
 | 2026-07-22 16:30 | #task-14 | brainstorming | 设计 Lightweight Observable CLI 表现层方案：Renderer 抽象 + SessionManager + Tracer | 用户要求不引入 emoji，采用 [STATE] 格式；不引入 rich/prompt_toolkit | - |
 | 2026-07-22 16:45 | #task-14 | writing-plans | 生成 5-Task 实现计划（observability → renderer → session → integration → build） | 用户选择方案 A+（轻量交互式 + 部分可视化能力） | - |
+| 2026-07-22 22:46 | #task-03 | executing-plans | Add CLI layer SessionManager, interactive mode, commands; delete old cli.py | - | 60cae73 |
+| 2026-07-22 22:57 | #task-04 | executing-plans | Integrate Renderer/Tracer into StateMachine callbacks; pass from SessionManager | Removed redundant on_stop in session.submit (now handled by FSM _on_stop) | e677820 |

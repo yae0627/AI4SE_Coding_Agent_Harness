@@ -89,6 +89,8 @@ class SessionManager:
             guardrail_engine=guardrails,
             feedback_loop=feedback,
             memory_manager=memory,
+            renderer=self._renderer,
+            tracer=self._tracer,
         )
 
     def start(self) -> None:
@@ -105,7 +107,6 @@ class SessionManager:
         harness = self._build_harness(task)
         self._harness = harness
         result = harness.run()
-        self._renderer.on_stop(harness.stop_reason, harness.state.iteration)
         return result
 
     def interactive(self) -> None:

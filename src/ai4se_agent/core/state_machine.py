@@ -1,15 +1,24 @@
 # src/ai4se_agent/core/state_machine.py
 from typing import Any, Optional
 from transitions import Machine
+from ai4se_agent.cli.renderer import NullRenderer, Renderer
 from ai4se_agent.context.builder import ContextBuilder
 from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.core.action import ActionParser, ActionValidator
-from ai4se_agent.llm.base import LLMAdapter
-from ai4se_agent.tools.registry import ToolRegistry
-from ai4se_agent.guardrails.engine import GuardrailEngine
 from ai4se_agent.feedback.loop import FeedbackLoop
+from ai4se_agent.guardrails.engine import GuardrailEngine
+from ai4se_agent.llm.base import LLMAdapter
 from ai4se_agent.memory.manager import MemoryManager
-from ai4se_agent.types import Action, GuardrailResult, ToolResult, StopReason
+from ai4se_agent.observability.events import (
+    ActionEvent,
+    FeedbackEvent,
+    GuardrailEvent,
+    LLMEvent,
+    ToolEvent,
+)
+from ai4se_agent.observability.tracer import NullTracer, Tracer
+from ai4se_agent.tools.registry import ToolRegistry
+from ai4se_agent.types import Action, GuardrailResult, StopReason, ToolResult
 
 
 class HarnessStateMachine:
@@ -33,6 +42,8 @@ class HarnessStateMachine:
         feedback_loop: FeedbackLoop | None,
         memory_manager: MemoryManager,
         max_iterations: int = 20,
+        renderer: Renderer = NullRenderer(),
+        tracer: Tracer = NullTracer(),
     ):
         self.state = agent_state
         self.llm = llm_adapter
@@ -48,6 +59,8 @@ class HarnessStateMachine:
         self._pending_guardrail: Optional[GuardrailResult] = None
         self._last_tool_result: Optional[ToolResult] = None
         self._context_builder = ContextBuilder(tools=list(self.tools._tools.values()))
+        self._renderer = renderer
+        self._tracer = tracer
 
         self.machine = Machine(
             model=self,
@@ -75,7 +88,7 @@ class HarnessStateMachine:
         self.machine.add_transition("feedback_done", "FEEDBACK", "MEMORY_UPDATE", after="_on_memory_update")
         self.machine.add_transition("feedback_correct", "FEEDBACK", "CONTEXT_ORG", after="_on_context_org")
         self.machine.add_transition("continue_loop", "MEMORY_UPDATE", "CONTEXT_ORG", after="_on_context_org")
-        self.machine.add_transition("stop", "*", "STOP")
+        self.machine.add_transition("stop", "*", "STOP", after="_on_stop")
 
     def run(self) -> dict:
         self.start()
@@ -85,14 +98,21 @@ class HarnessStateMachine:
         self.state.increment_iteration()
         if self.state.iteration > self.max_iterations:
             self.stop_reason = StopReason.MAX_ITERATION
+            self._renderer.on_state_change("CONTEXT_ORG", "STOP", self.state.iteration)
             self.stop()
             return
+        self._renderer.on_state_change("", "CONTEXT_ORG", self.state.iteration)
         self.call_llm()
 
     def _on_llm_call(self) -> None:
         try:
             messages = self._context_builder.build(self.state)
             response = self.llm.generate(messages)
+            model = getattr(self.llm, "model", "")
+            self._renderer.on_llm_call(self.state.iteration, model, response)
+            self._tracer.record(
+                LLMEvent(self.state.iteration, model, messages, response)
+            )
             self.state.history.append({"role": "assistant", "content": response})
             self.parse_action()
         except Exception:
@@ -106,6 +126,9 @@ class HarnessStateMachine:
     def _on_action_parse(self) -> None:
         last_msg = self.state.history[-1]["content"]
         if "[DONE]" in last_msg:
+            self._renderer.on_state_change(
+                "ACTION_PARSE", "STOP", self.state.iteration
+            )
             self.stop_reason = StopReason.SUCCESS
             self.stop()
             return
@@ -118,12 +141,22 @@ class HarnessStateMachine:
             self.retry_parse()
             return
         self._pending_action = action
+        self._renderer.on_action(self.state.iteration, action, None)
+        self._tracer.record(
+            ActionEvent(self.state.iteration, action.name, action.params)
+        )
         self.check_guardrails()
 
     def _on_guardrail(self) -> None:
         assert self._pending_action is not None
         result = self.guardrails.check(self._pending_action)
         self._pending_guardrail = result
+        self._renderer.on_action(self.state.iteration, self._pending_action, result)
+        self._tracer.record(
+            GuardrailEvent(
+                self.state.iteration, result.verdict, result.policy, result.reason
+            )
+        )
         if result.verdict == "DENY":
             self.deny_action()
         elif result.verdict == "REQUIRE_APPROVAL":
@@ -148,6 +181,17 @@ class HarnessStateMachine:
         result = self.tools.execute(self._pending_action)
         self._last_tool_result = result
         self.state.record_turn(self._pending_action, result.output)
+        self._renderer.on_tool_exec(
+            self.state.iteration, self._pending_action.name, result
+        )
+        self._tracer.record(
+            ToolEvent(
+                self.state.iteration,
+                self._pending_action.name,
+                result.success,
+                result.output,
+            )
+        )
         if result.success:
             self.tool_success()
         else:
@@ -176,9 +220,18 @@ class HarnessStateMachine:
                 self.state.retry_count += 1
                 if self.state.retry_count >= 3:
                     self.state.retry_count = 0
+                self._renderer.on_feedback(self.state.iteration, True, plan.scope)
+                self._tracer.record(
+                    FeedbackEvent(self.state.iteration, plan.scope, True)
+                )
                 self.feedback_correct()
                 return
+        self._renderer.on_feedback(self.state.iteration, False, "")
+        self._tracer.record(FeedbackEvent(self.state.iteration, "", False))
         self.feedback_done()
+
+    def _on_stop(self) -> None:
+        self._renderer.on_stop(self.stop_reason, self.state.iteration)
 
     def _on_memory_update(self) -> None:
         self.continue_loop()
