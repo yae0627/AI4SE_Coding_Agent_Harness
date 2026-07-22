@@ -142,3 +142,44 @@ src/ai4se_agent/context/     ← 新增 Context Engineering 层
 - **类型检查**: mypy 零错误（42 个源文件）
 - **Lint**: ruff 零告警
 - **真实 API**: `ai4se-agent "run shell command: dir"` → `Result: success (success) after 2 iterations`
+
+## 阶段五：表现层设计 — Lightweight Observable CLI（2026-07-22）
+
+### 背景
+
+真实 API 验证通过后，用户端表现层仍为最简单的单次任务模式。需要向 OpenCode / Claude Code 风格靠拢，提供交互式会话、过程可视化、可调试性。
+
+### 设计决策
+
+| 决策点 | 选项 | 最终选择 | 理由 |
+|--------|------|---------|------|
+| 终端 UI 框架 | Rich / 原生 + colorama / 纯文本 | **colorama + 原生 input()** | 评分重点是 Harness 内核，避免重 UI 依赖 |
+| 交互模式 | 纯单次 / 交互式 / 混合 | **混合（单次命令 + 交互式会话）** | 兼顾脚本使用和 Demo 演示 |
+| 可视化策略 | emoji 标识 / 纯文本状态标记 | **纯文本 `[STATE]` 格式** | 用户要求不引入 emoji |
+| 输出层级 | 单层 / 普通 + verbose 模式 | **普通 + `--verbose` 双模式** | 默认简洁，调试时展开 |
+| 可观测性 | 仅终端输出 / 事件追踪 | **Tracer + JSON Trace 文件** | 支持回放和调试 |
+
+### 产出文件
+
+- `docs/superpowers/specs/2026-07-22-observable-cli-design.md` — 表现层设计规约
+- `docs/superpowers/plans/2026-07-22-observable-cli-plan.md` — 实现计划（5 个 Task）
+
+### 架构摘要
+
+新增两个模块，核心层保持不变：
+
+```
+cli/                     ← 表现层
+├── renderer.py          ← Renderer ABC + TerminalRenderer + NullRenderer
+├── session.py           ← SessionManager：交互循环、会话管理
+├── commands.py          ← 交互命令（/status, /reset, /verbose）
+└── main.py              ← CLI 入口
+
+observability/           ← 可观测性层
+├── events.py            ← 事件类型（STATE_CHANGED, LLM_CALLED, TOOL_EXECUTED 等）
+└── tracer.py            ← Tracer：record / save / replay
+
+core/state_machine.py    ← 修改：添加 Renderer/Tracer 回调注入
+```
+
+核心原则：StateMachine 不知道表现层细节，通过抽象 Renderer 接口输出事件；CLI 只是订阅者之一。

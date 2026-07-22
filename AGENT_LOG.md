@@ -34,3 +34,5 @@
 | 2026-07-22 15:40 | #task-13 | fix | 状态机新增 llm_error 转移（LLM_CALL→CONTEXT_ORG），修复 LLM 异常时 retry_context 非法触发 | Bug 2：初始状态机只建模正常路径 | - |
 | 2026-07-22 15:45 | #task-13 | test | 新增 ContextBuilder 单测（4 个），更新 test_agent_state 适配新 history/feedback 结构 | - | - |
 | 2026-07-22 15:50 | #task-13 | verify | 53 个测试通过，mypy 零错误（42 文件），ruff 零告警，真实 API 端到端验证 success | - | - |
+| 2026-07-22 16:30 | #task-14 | brainstorming | 设计 Lightweight Observable CLI 表现层方案：Renderer 抽象 + SessionManager + Tracer | 用户要求不引入 emoji，采用 [STATE] 格式；不引入 rich/prompt_toolkit | - |
+| 2026-07-22 16:45 | #task-14 | writing-plans | 生成 5-Task 实现计划（observability → renderer → session → integration → build） | 用户选择方案 A+（轻量交互式 + 部分可视化能力） | - |
