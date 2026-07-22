@@ -35,7 +35,8 @@ def build_harness(task: str, workspace: str = ".") -> HarnessStateMachine:
     else:
         api_key = config.get("api_key") or ""
         base_url = config.get("base_url")
-        llm = OpenAIAdapter(api_key=api_key, base_url=base_url)
+        model = config.get("model") or ""
+        llm = OpenAIAdapter(api_key=api_key, base_url=base_url, model=model)
 
     tools = ToolRegistry()
     tools.register(ReadFileTool())

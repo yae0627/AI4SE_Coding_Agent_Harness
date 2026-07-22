@@ -1,11 +1,11 @@
-from typing import Any, Optional
+from typing import Any
 from openai import OpenAI
 from ai4se_agent.llm.base import LLMAdapter
 
 
-class OpenAIAdapter(LLMAdapter):
-    def __init__(self, api_key: str, base_url: Optional[str] = None, model: str = ""):
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+class LocalAdapter(LLMAdapter):
+    def __init__(self, base_url: str, model: str = "local-model"):
+        self.client = OpenAI(api_key="not-needed", base_url=base_url)
         self.model = model
 
     def generate(self, messages: list[dict]) -> str:

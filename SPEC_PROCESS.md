@@ -95,3 +95,50 @@
 - **Lint**: ruff 全部通过
 - **CI/CD**: GitHub Actions + .gitlab-ci.yml 配置完成
 - **机制演示**: 5 个 demo 脚本，覆盖护栏拦截、反馈闭环、增量修正、FailureDB、路径逃逸防护
+
+## 阶段四：真实 API 验证与架构修复（2026-07-22）
+
+### 冷启动验证：接入真实 LLM 暴露 3 个 Bug
+
+接入 `njusehub.info` API（deepseek-v4-flash 模型）进行端到端验证，暴露 3 个关联 Bug：
+
+| Bug | 类型 | 现象 | 根因 |
+|-----|------|------|------|
+| Bug 3（根因） | 架构设计缺陷 | LLM 收到空 messages `[]` | Context Engineering 层缺失：AgentState 存了 goal 但无机制构造 LLM 输入 |
+| Bug 1 | 架构设计缺陷 | `503 model_not_found: gpt-4o` | 模型名硬编码在 OpenAIAdapter，ConfigLoader 无 model 映射 |
+| Bug 2 | 逻辑错误 | `MachineError: Can't trigger retry_context from LLM_CALL` | 状态机只建模正常路径，LLM 调用失败时无合法转移 |
+
+### 用户主导的架构分析
+
+用户对 Bug 3 做了根因级定位，指出这不是简单的"忘记填充 context"，而是 **Context Engineering 层的架构缺失**：
+
+1. **CONTEXT_ORG 职责不清**：同时做状态转移、context 初始化、prompt 管理、调 LLM，职责过重
+2. **只初始化一次**：`if not context` 意味着后续反馈无法注入，LLM 不知道上一轮失败原因
+3. **工具列表硬编码**：应从 ToolRegistry 动态生成
+
+### 修复方案（用户设计，Agent 执行）
+
+| 层级 | 修改前 | 修改后 |
+|------|--------|--------|
+| AgentState | `context=[]`（一次性填充） | `history=[]` + `feedback=[]`（分离存储） |
+| 上下文构造 | `_on_context_org` 内联拼 prompt | `ContextBuilder.build(state)` 每轮动态生成 |
+| 工具列表 | system prompt 硬编码 | 从 `ToolRegistry.list()` 动态生成 |
+| 状态机 | 知道 prompt 细节 | 只调 `ContextBuilder`，不碰 prompt |
+| 错误路径 | 只有正常路径 | 新增 `llm_error` 转移 `LLM_CALL → CONTEXT_ORG` |
+| 模型配置 | 硬编码 `gpt-4o` | `OPENAI_MODEL` 环境变量，无默认值 |
+
+### 新增模块
+
+```
+src/ai4se_agent/context/     ← 新增 Context Engineering 层
+├── __init__.py
+├── builder.py               # ContextBuilder.build(state) → messages
+└── prompt.py                # build_system_prompt(tools) → str
+```
+
+### 验证结果
+
+- **测试**: 53 个单元测试全部通过（新增 5 个 ContextBuilder 测试）
+- **类型检查**: mypy 零错误（42 个源文件）
+- **Lint**: ruff 零告警
+- **真实 API**: `ai4se-agent "run shell command: dir"` → `Result: success (success) after 2 iterations`

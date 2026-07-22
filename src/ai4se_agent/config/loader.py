@@ -19,6 +19,7 @@ class ConfigLoader:
         env_map = {
             "api_key": "OPENAI_API_KEY",
             "base_url": "OPENAI_BASE_URL",
+            "model": "OPENAI_MODEL",
             "provider": "LLM_PROVIDER",
             "local_model_url": "LOCAL_MODEL_URL",
             "local_model_name": "LOCAL_MODEL_NAME",

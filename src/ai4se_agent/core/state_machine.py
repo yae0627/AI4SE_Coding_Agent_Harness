@@ -1,6 +1,7 @@
 # src/ai4se_agent/core/state_machine.py
 from typing import Any, Optional
 from transitions import Machine
+from ai4se_agent.context.builder import ContextBuilder
 from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.core.action import ActionParser, ActionValidator
 from ai4se_agent.llm.base import LLMAdapter
@@ -46,6 +47,7 @@ class HarnessStateMachine:
         self._pending_action: Optional[Action] = None
         self._pending_guardrail: Optional[GuardrailResult] = None
         self._last_tool_result: Optional[ToolResult] = None
+        self._context_builder = ContextBuilder(tools=list(self.tools._tools.values()))
 
         self.machine = Machine(
             model=self,
@@ -57,6 +59,7 @@ class HarnessStateMachine:
 
         self.machine.add_transition("start", "IDLE", "CONTEXT_ORG", after="_on_context_org")
         self.machine.add_transition("retry_context", "CONTEXT_ORG", "CONTEXT_ORG", after="_on_context_org")
+        self.machine.add_transition("llm_error", "LLM_CALL", "CONTEXT_ORG", after="_on_context_org")
         self.machine.add_transition("call_llm", "CONTEXT_ORG", "LLM_CALL", after="_on_llm_call")
         self.machine.add_transition("parse_action", "LLM_CALL", "ACTION_PARSE", after="_on_action_parse")
         self.machine.add_transition("retry_parse", "ACTION_PARSE", "CONTEXT_ORG", after="_on_context_org")
@@ -88,9 +91,9 @@ class HarnessStateMachine:
 
     def _on_llm_call(self) -> None:
         try:
-            messages = self.state.context
+            messages = self._context_builder.build(self.state)
             response = self.llm.generate(messages)
-            self.state.context.append({"role": "assistant", "content": response})
+            self.state.history.append({"role": "assistant", "content": response})
             self.parse_action()
         except Exception:
             self.state.error_count += 1
@@ -98,10 +101,10 @@ class HarnessStateMachine:
                 self.stop_reason = StopReason.LLM_ERROR
                 self.stop()
             else:
-                self.retry_context()
+                self.llm_error()
 
     def _on_action_parse(self) -> None:
-        last_msg = self.state.context[-1]["content"]
+        last_msg = self.state.history[-1]["content"]
         if "[DONE]" in last_msg:
             self.stop_reason = StopReason.SUCCESS
             self.stop()
@@ -144,6 +147,7 @@ class HarnessStateMachine:
         assert self._pending_action is not None
         result = self.tools.execute(self._pending_action)
         self._last_tool_result = result
+        self.state.record_turn(self._pending_action, result.output)
         if result.success:
             self.tool_success()
         else:
@@ -162,6 +166,13 @@ class HarnessStateMachine:
         if self.feedback:
             plan = self.feedback.run(self._last_tool_result, self.state.retry_count)
             if plan:
+                feedback_msg = (
+                    f"Feedback: {plan.strategy}\n"
+                    f"Scope: {plan.scope}\n"
+                    f"Target files: {plan.target_files}\n"
+                    f"Retry count: {plan.retry_count}"
+                )
+                self.state.record_feedback(feedback_msg)
                 self.state.retry_count += 1
                 if self.state.retry_count >= 3:
                     self.state.retry_count = 0

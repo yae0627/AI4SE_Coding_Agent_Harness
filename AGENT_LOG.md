@@ -29,3 +29,8 @@
 | 2026-07-21 17:55 | #task-finish | mypy | Fix 39 mypy type errors across 5 files | 添加 __getattr__、Optional 类型标注、assert 守卫 | a9a1a89 |
 | 2026-07-21 17:56 | #task-finish | chore | Gitignore .superpowers/ review artifacts | - | 0697d5f |
 | 2026-07-21 18:00 | #task-finish | git | Merge PR to main, sync local, delete branch | - | 2ee2952 |
+| 2026-07-22 15:30 | #task-13 | refactor | 引入 ContextBuilder，重构 AgentState（context→history+feedback），状态机补全 LLM 错误转移路径 | 用户分析定位 Bug 3 为根因：Context Engineering 层缺失，采纳用户方案分离 history/feedback | - |
+| 2026-07-22 15:35 | #task-13 | fix | ConfigLoader 新增 model 映射，OpenAIAdapter 移除默认模型，CLI 从 config 读 model | Bug 1：模型名硬编码，无外部配置入口 | - |
+| 2026-07-22 15:40 | #task-13 | fix | 状态机新增 llm_error 转移（LLM_CALL→CONTEXT_ORG），修复 LLM 异常时 retry_context 非法触发 | Bug 2：初始状态机只建模正常路径 | - |
+| 2026-07-22 15:45 | #task-13 | test | 新增 ContextBuilder 单测（4 个），更新 test_agent_state 适配新 history/feedback 结构 | - | - |
+| 2026-07-22 15:50 | #task-13 | verify | 53 个测试通过，mypy 零错误（42 文件），ruff 零告警，真实 API 端到端验证 success | - | - |
