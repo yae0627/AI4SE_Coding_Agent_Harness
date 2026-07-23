@@ -81,6 +81,61 @@ class ActionParser:
         self._fallback = fallback
         self._legacy = LegacyActionParser()
 
+    def _repair_json(self, text: str) -> str | None:
+        """Fix unescaped double quotes inside JSON string values.
+
+        LLMs frequently forget to escape ``"`` inside generated code/content strings.
+        This walks the JSON text tracking string boundaries and escapes any ``"``
+        that appears inside a string value where the next non-whitespace character
+        is not a JSON structural character (``,``, ``}``, ``]``, ``:``).
+        """
+        result: list[str] = []
+        i = 0
+        in_string = False
+        escape_next = False
+        fixed = False
+
+        while i < len(text):
+            ch = text[i]
+
+            if escape_next:
+                result.append(ch)
+                escape_next = False
+                i += 1
+                continue
+
+            if ch == '\\' and in_string:
+                result.append(ch)
+                escape_next = True
+                i += 1
+                continue
+
+            if ch == '"':
+                if not in_string:
+                    result.append(ch)
+                    in_string = True
+                else:
+                    rest = text[i + 1:]
+                    j = 0
+                    while j < len(rest) and rest[j] in ' \t\n\r':
+                        j += 1
+                    if j < len(rest) and rest[j] in ',}]:':
+                        result.append(ch)
+                        in_string = False
+                    else:
+                        result.append('\\"')
+                        fixed = True
+                i += 1
+                continue
+
+            result.append(ch)
+            i += 1
+
+        if in_string:
+            result.append('"')
+
+        return ''.join(result) if fixed else None
+
     def _try_json(self, text: str) -> ParseResult:
         text = text.strip()
         code_block = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
@@ -91,10 +146,19 @@ class ActionParser:
         if brace_start == -1 or brace_end == -1 or brace_end <= brace_start:
             return ParseResult(success=False, error="No JSON object found")
         text = text[brace_start:brace_end + 1]
+
         try:
             obj = json.loads(text)
         except json.JSONDecodeError as e:
-            return ParseResult(success=False, error=f"Invalid JSON: {e}")
+            repaired = self._repair_json(text)
+            if repaired:
+                try:
+                    obj = json.loads(repaired)
+                except json.JSONDecodeError as e2:
+                    return ParseResult(success=False, error=f"Invalid JSON: {e2}")
+            else:
+                return ParseResult(success=False, error=f"Invalid JSON: {e}")
+
         if "action" not in obj:
             return ParseResult(success=False, error="Missing 'action' field in JSON")
         return ParseResult(

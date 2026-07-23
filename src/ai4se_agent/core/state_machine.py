@@ -127,6 +127,13 @@ class HarnessStateMachine:
         last_msg = self.state.history[-1]["content"]
         result = self.parser.parse(last_msg)
         if not result.success:
+            self.state.record_feedback(
+                f"Your last response could not be parsed as a valid action. "
+                f"Error: {result.error}. "
+                f"Please respond with a JSON object: "
+                f'{{"action": "<tool_name>", "parameters": {{...}}}}. '
+                f"Make sure all double quotes inside string values are escaped with backslash (\\\")."
+            )
             self.retry_parse()
             return
         action = result.action
@@ -137,6 +144,10 @@ class HarnessStateMachine:
             return
         errors = self.validator.validate(action)
         if errors:
+            self.state.record_feedback(
+                f"Action validation failed: {'; '.join(errors)}. "
+                f"Please fix the missing or incorrect parameters and try again."
+            )
             self.retry_parse()
             return
         self._pending_action = action

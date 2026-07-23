@@ -132,3 +132,52 @@ def test_legacy_fallback():
     assert result.success is True
     assert result.action.name == "write_file"
     assert result.action.parameters["path"] == "test.txt"
+
+
+def test_repair_unescaped_quotes_in_content():
+    parser = ActionParser()
+    text = '{"action": "write_file", "parameters": {"path": "x.cpp", "content": "cout << "hello";"}}'
+    result = parser.parse(text)
+    assert result.success is True
+    assert result.action.name == "write_file"
+    assert 'cout << "hello";' in result.action.parameters["content"]
+
+
+def test_repair_multiple_unescaped_quotes():
+    parser = ActionParser()
+    text = '{"action": "shell", "parameters": {"command": "echo "hello world" && echo "done""}}'
+    result = parser.parse(text)
+    assert result.success is True
+    assert 'echo "hello world" && echo "done"' in result.action.parameters["command"]
+
+
+def test_no_false_positive_repair():
+    """Valid JSON with properly escaped quotes should not be altered."""
+    parser = ActionParser()
+    text = '{"action": "shell", "parameters": {"command": "echo \\"hello\\""}}'
+    result = parser.parse(text)
+    assert result.success is True
+    assert result.action.parameters["command"] == 'echo "hello"'
+
+
+def test_repair_code_with_quotes():
+    """C++ code with streaming operators and string literals."""
+    parser = ActionParser()
+    text = (
+        '{"action": "write_file", "parameters": {'
+        '"path": "main.cpp", '
+        '"content": "#include <iostream>\\\\nint main() { std::cout << \\"hello\\"; }\\\\n"'
+        '}}'
+    )
+    result = parser.parse(text)
+    assert result.success is True
+    assert 'std::cout << "hello"' in result.action.parameters["content"]
+
+
+def test_valid_json_still_works():
+    """Valid JSON without any issues should parse correctly."""
+    parser = ActionParser()
+    text = '{"action": "shell", "parameters": {"command": "ls -la", "timeout": 30}}'
+    result = parser.parse(text)
+    assert result.success is True
+    assert result.action.parameters["command"] == "ls -la"
