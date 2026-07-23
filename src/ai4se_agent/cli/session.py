@@ -1,4 +1,4 @@
-from typing import Any
+from pathlib import Path
 
 from ai4se_agent.cli.commands import handle_command
 from ai4se_agent.cli.renderer import NullRenderer, Renderer
@@ -15,8 +15,7 @@ from ai4se_agent.guardrails.engine import GuardrailEngine
 from ai4se_agent.guardrails.file_policy import FilePolicy
 from ai4se_agent.guardrails.git_policy import GitPolicy
 from ai4se_agent.guardrails.workspace_policy import WorkspacePolicy
-from ai4se_agent.llm.mock_adapter import MockAdapter
-from ai4se_agent.llm.openai_adapter import OpenAIAdapter
+from ai4se_agent.llm.manager import LLMManager
 from ai4se_agent.memory.manager import MemoryManager
 from ai4se_agent.memory.persistent import PersistentMemory
 from ai4se_agent.memory.session import SessionMemory
@@ -32,26 +31,19 @@ from ai4se_agent.tools.write_file import WriteFileTool
 class SessionManager:
     def __init__(
         self,
+        config: ConfigLoader | None = None,
         renderer: Renderer | None = None,
         tracer: Tracer | None = None,
     ) -> None:
+        self._config = config or ConfigLoader()
+        self._llm = LLMManager(self._config)
         self._renderer = renderer or NullRenderer()
         self._tracer = tracer or NullTracer()
         self._harness: HarnessStateMachine | None = None
         self.state: AgentState | None = None
 
     def _build_harness(self, task: str) -> HarnessStateMachine:
-        config = ConfigLoader()
-        provider = config.get_provider()
-        if provider == "mock":
-            llm: Any = MockAdapter(
-                responses=['{"action": "shell", "parameters": {"command": "echo hello"}}', '{"action": "finish", "parameters": {}}']
-            )
-        else:
-            api_key = config.get("api_key") or ""
-            base_url = config.get("base_url")
-            model = config.get("model") or ""
-            llm = OpenAIAdapter(api_key=api_key, base_url=base_url, model=model)
+        llm = self._llm.get_adapter()
 
         tools = ToolRegistry()
         tools.register(ReadFileTool())
@@ -94,11 +86,11 @@ class SessionManager:
         )
 
     def start(self) -> None:
-        config = ConfigLoader()
-        provider = config.get_provider()
-        model = config.get("model") or "unknown"
+        cfg = self._config.load()
+        model = cfg.model.active or "unknown"
+        provider = cfg.provider.name
         self._renderer.on_state_change("", "IDLE", 0)
-        print("Workspace: .")
+        print(f"Workspace: {Path.cwd().resolve()}")
         print(f"Model: {model}")
         print(f"Provider: {provider}")
         print()

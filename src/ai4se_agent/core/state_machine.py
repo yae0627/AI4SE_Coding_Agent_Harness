@@ -1,4 +1,5 @@
 # src/ai4se_agent/core/state_machine.py
+from pathlib import Path
 from typing import Any, Optional
 from transitions import Machine
 from ai4se_agent.cli.renderer import NullRenderer, Renderer
@@ -59,7 +60,7 @@ class HarnessStateMachine:
         self._pending_guardrail: Optional[GuardrailResult] = None
         self._last_tool_result: Optional[ToolResult] = None
         self._context_builder = ContextBuilder(
-            tool_registry=self.tools, workspace_root="."
+            tool_registry=self.tools, workspace_root=str(Path.cwd().resolve())
         )
         self._renderer = renderer
         self._tracer = tracer
