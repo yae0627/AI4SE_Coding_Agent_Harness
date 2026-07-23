@@ -45,3 +45,12 @@
 | 2026-07-22 17:45 | #task-15 | verify | 69 个测试通过，mypy 零错误（49 文件），ruff 零告警，真实 API 端到端验证通过 | - | - |
 | 2026-07-22 22:46 | #task-03 | executing-plans | Add CLI layer SessionManager, interactive mode, commands; delete old cli.py | - | 60cae73 |
 | 2026-07-22 22:57 | #task-04 | executing-plans | Integrate Renderer/Tracer into StateMachine callbacks; pass from SessionManager | Removed redundant on_stop in session.submit (now handled by FSM _on_stop) | e677820 |
+| 2026-07-23 14:00 | #task-16 | brainstorming | 设计 Action Protocol Migration：JSON Action + Tool Schema + finish action | 用户指出 6 点问题，拆分 A/B/C 三阶段，优先 A：Action Protocol Migration | - |
+| 2026-07-23 14:30 | #task-16 | writing-plans | 生成 6-Task 实现计划：types/schema → tools → parser/validator → context → state-machine → integration | 用户修正设计：ToolSchema 用 dict parameters、Parser 返回 ParseResult、保留旧 fallback | 49ed33c |
+| 2026-07-23 15:00 | #task-17 | executing-plans | Task 1: 添加 ParseResult、Tool.schema ABC、ToolRegistry.list_schemas()、Action.params→parameters | - | 12e6327 |
+| 2026-07-23 15:15 | #task-17 | executing-plans | Task 2: 5 个工具实现 schema property（read/write/edit/shell/run_test） | - | 812175e |
+| 2026-07-23 15:30 | #task-17 | executing-plans | Task 3: 重写 ActionParser（JSON+fallback）+ ActionValidator（schema 驱动），参数改名 | - | 812175e |
+| 2026-07-23 15:45 | #task-17 | executing-plans | Task 4: ContextBuilder 接收 ToolRegistry，prompt.py 动态生成系统提示词 | - | 812175e |
+| 2026-07-23 16:00 | #task-17 | executing-plans | Task 5: 状态机 [DONE]→finish action，替换所有引用 | - | 812175e |
+| 2026-07-23 16:15 | #task-17 | executing-plans | Task 6: 集成接线，SessionManager 传入 ActionValidator schemas | - | 812175e |
+| 2026-07-23 16:30 | #task-17 | fix | JSON 修复：LLM 返回未转义双引号导致 json.loads 失败，添加 JSON 修复逻辑 + 解析错误反馈给 LLM | 用户诊断定位根因：LLM 在长 C++ 代码中遗漏 \" 转义，harness 层缺少格式校验 | 5fc73aa |

@@ -202,3 +202,59 @@ core/state_machine.py    ← 修改：添加 Renderer/Tracer 回调注入
 - **类型检查**: mypy 零错误（49 个源文件）
 - **Lint**: ruff 零告警
 - **真实 API**: `ai4se-agent "run shell command: dir"` → 状态转移可见，`Result: success (success) after 2 iterations`
+
+## 阶段四：Action Protocol Migration（2026-07-23）
+
+### 背景
+
+用户发现系统 prompt 存在 6 点架构问题：
+
+| 当前 | 问题 |
+|------|------|
+| 工具描述写死 | 与 Tool 实现分离，新增工具需同步修改 |
+| 文本 action (`action: name key=value`) | 转义脆弱，`\\n`/`\\\"` 解析易出错 |
+| `[DONE]` 哨兵 | 不走 validate/guardrail 流程，与架构不一致 |
+| Workflow 控制行为靠 prompt | 应靠 FSM + Feedback 代码机制 |
+| 一个大 Prompt | 应 ContextBuilder 组合 |
+| 静态环境 | 缺少动态 workspace context |
+
+### 决策：分三阶段推进
+
+**A. Action Protocol Migration（优先）**：Tool Schema → JSON Action → finish action
+**B. Context Engineering**：Prompt 拆分 → Workflow 优化 → Workspace Context
+**C. 可观测性优化**：Renderer / Trace 增强
+
+### 用户修正设计
+
+| 项目 | 原始方案 | 用户修正 |
+|------|---------|---------|
+| ToolSchema | `@dataclass ToolSchema` | `dict parameters`（OpenAI function calling 格式） |
+| Action 字段 | `Action.params` | `Action.parameters` |
+| Parser 返回 | `None` | `ParseResult(success, action, error)` |
+| JSON 提取 | 直接 `json.loads` | 支持 ` ```json ``` ` 代码块包裹 |
+| finish | 特殊处理 | 经过 Validator |
+| Validator | 仅检查 required | 增加类型检查 |
+| 迁移 | 直接替换 | 保留旧 Parser 作为 fallback |
+
+### 关键迭代：JSON 转义问题
+
+**Agent 诊断**：真实 LLM 在写 C++ 代码时，JSON content 字段中的双引号（如 `cout << " "` ）未转义为 `\"`，导致 `json.loads` 抛出 `JSONDecodeError`。harness 层面缺少 JSON 格式校验/修复机制。
+
+**修复**：添加 JSON repair 逻辑（自动修复常见转义问题）+ 解析错误反馈给 LLM 重试。
+
+### 实现概览
+
+| Task | 模块 | 变更 | 测试数 | Commit |
+|------|------|------|--------|--------|
+| 1 | types + Tool schema foundation | ParseResult, Tool.schema ABC, list_schemas(), params→parameters | 4 | 12e6327 |
+| 2 | Tool schema implementations | 5 个工具实现 schema | 5 | 812175e |
+| 3 | ActionParser + ActionValidator | JSON+fallback 解析器, schema 驱动验证器 | 12 | 812175e |
+| 4 | ContextBuilder + prompt | 动态生成 system prompt | 4 | 812175e |
+| 5 | State machine: finish action | [DONE]→finish | 2 | 812175e |
+| 6 | Integration wiring | 全线联通 | - | 812175e |
+| fix | JSON repair | 修复未转义引号 + 错误反馈 | - | 5fc73aa |
+
+### 验证结果
+
+- **测试**: 85 个单元测试全部通过（新增 21 个）
+- **真实 API**: `ai4se-agent "write a C++ merge sort program"` → 写文件、编译、运行成功

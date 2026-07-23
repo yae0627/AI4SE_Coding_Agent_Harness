@@ -2157,3 +2157,26 @@ Task 9 (Feedback) ────────────────────�
 ```
 
 Tasks 2-9 are independent of each other and can be parallelized.
+
+---
+
+## Phase B: Action Protocol Migration (2026-07-23)
+
+> Reference: `docs/superpowers/plans/2026-07-23-action-protocol-migration-plan.md`
+
+### Task 16: Action Protocol Migration Spec & Plan
+
+- [x] **Step 1**: Brainstorming: 识别 6 点架构问题，拆分 A/B/C 三阶段
+- [x] **Step 2**: Writing-plans: 生成 6-Task 实现计划
+- [x] **Step 3**: Commit spec & plan → `49ed33c`
+
+### Task 17: Action Protocol Migration Implementation
+
+- [x] **Task 1**: Types + Tool Schema foundation (ParseResult, Tool.schema, params→parameters) → `12e6327`
+- [x] **Task 2**: Tool Schema implementations (5 tools) → `812175e`
+- [x] **Task 3**: ActionParser + ActionValidator rewrite (JSON+fallback, schema-driven) → `812175e`
+- [x] **Task 4**: ContextBuilder + prompt dynamic generation → `812175e`
+- [x] **Task 5**: State machine: [DONE]→finish action → `812175e`
+- [x] **Task 6**: Integration wiring → `812175e`
+- [x] **Fix**: JSON repair for unescaped quotes + parse error feedback → `5fc73aa`
+- [x] **Verify**: 85 tests pass, real API end-to-end success
