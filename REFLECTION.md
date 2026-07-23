@@ -89,6 +89,41 @@ AI4SE 这门课的核心价值在于回答两个问题：
 
 3. **更关注 Context Engineering 层**：Bug 3 暴露的 Context Engineering 缺失是项目中最有价值的发现。如果在设计阶段就意识到"状态数据和模型输入之间的桥梁"是独立职责，早期的架构会更干净。
 
+## 六、Phase B+C：Context Engineering 与可观测性增强
+
+第三阶段（2026-07-23）完成了两项相互独立的增强——Context Engineering（B）和 Observability（C）——通过 Subagent-Driven Development 的 7 个 Task 并行推进。
+
+### Context Engineering — 从巨石到组合
+
+**核心转变**：将 52 行的 `build_system_prompt()` 拆解为 6 个独立 `PromptSection` 组件，由 `PromptComposer` 按需编排。
+
+```
+ContextBuilder.build()
+    ├── WorkspaceCollector.collect() → WorkspaceSnapshot
+    └── PromptComposer.compose(ctx)
+        ├── SystemRoleSection → "You are a coding agent..."
+        ├── ToolSection       → ctx.tools
+        ├── FormatSection     → JSON 格式说明 + 转义规则
+        ├── ExampleSection    → 少样本示例
+        ├── WorkspaceSection  → ctx.workspace (OS/文件/git/时间)
+        └── RulesSection      → ctx.rules (来自 MemoryManager)
+```
+
+关键设计决策：
+- **Section 协议统一**：`PromptSection.build(ctx: PromptContext) -> str`，所有 section 共享同一数据契约
+- **Workspace 动态注入**：`WorkspaceCollector` 采集 `sys.platform`、文件列表（跳过 `.git`/`__pycache__`）、git 分支、ISO 8601 时间戳，5 秒 TTL 缓存避免每轮重复扫描
+- **空 section 自抑制**：`ToolSection`/`RulesSection`/`WorkspaceSection` 在无数据时返回 `""`，`PromptComposer` 自动跳过，避免 token 浪费
+
+### Observability — 可观测性闭环
+
+- **Renderer 增强**：新增 `on_token_usage`/`on_timing` 到 ABC，`TerminalRenderer` 支持可配置截断长度、`on_stop` 汇总 token 总数和总耗时
+- **Trace 增强**：`Event` 基类新增 `timestamp`（ISO 8601）和 `elapsed_ms`（从 session 开始），`Tracer` 新增 `record_token()` 和 `replay_filtered(event_type=, min_iteration=)` 结构化回放
+
+### 验证
+
+- **128 个测试**全部通过（Phase A 后的 90 个 + 新 38 个）
+- **真实 LLM 端到端**：`ai4se-agent "write hello2.cpp..."` → 写入 → 编译 g++ → 运行 `Hello AI4SE v2` ✅
+
 ## 七、总结
 
 本项目通过 Superpowers 框架完成了一个完整的 Coding Agent Harness 开发周期。最大的收获不是代码本身，而是对"AI 时代工程方法论"的批判性理解：
@@ -96,6 +131,7 @@ AI4SE 这门课的核心价值在于回答两个问题：
 - Brainstorming 和 Writing-Plans 是当前最有价值的技能，因为它们解决了"人如何与 AI 高效协作"的核心问题
 - TDD 在 AI 协作下是有效的保护机制，特别是在分层架构中保护核心层不被误改
 - 凭据和分发这类"非功能性需求"在实践中迫使开发者思考更深层的工程问题
+- Context Engineering 层是"状态数据 → 模型输入"的关键桥梁，早设计比晚修复成本低得多
 - 随着 AI 能力的提升，"规约是否成为脚镣"的矛盾会越来越突出，这需要工程方法论的持续演进
 
 最终，这个项目的核心启示是：**AI 不会降低对人的要求，它会改变对人的要求**——从"写代码"的能力，转向"设计约束、判断质量、做出决策"的能力。

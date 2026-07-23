@@ -54,3 +54,12 @@
 | 2026-07-23 16:00 | #task-17 | executing-plans | Task 5: 状态机 [DONE]→finish action，替换所有引用 | - | 812175e |
 | 2026-07-23 16:15 | #task-17 | executing-plans | Task 6: 集成接线，SessionManager 传入 ActionValidator schemas | - | 812175e |
 | 2026-07-23 16:30 | #task-17 | fix | JSON 修复：LLM 返回未转义双引号导致 json.loads 失败，添加 JSON 修复逻辑 + 解析错误反馈给 LLM | 用户诊断定位根因：LLM 在长 C++ 代码中遗漏 \" 转义，harness 层缺少格式校验 | 5fc73aa |
+| 2026-07-23 17:00 | #task-18 | brainstorming | 设计 Phase B+C：Context Engineering（Prompt 拆分/Workflow 优化/Workspace Context）+ Observability（Renderer/Trace 增强） | 用户提出 B.1-B.3 + C.1-C.2 六子任务，确定 PromptComposer + 6 Section 架构 | - |
+| 2026-07-23 17:30 | #task-18 | writing-plans | 生成 7-Task 实现计划：B track (Tasks 1-4) + C track (Tasks 5-6) + 集成验证 | 用户选择 Subagent-Driven 执行，B+C 同步在一个 Plan 中 | edbe100 |
+| 2026-07-23 17:45 | #task-18 | subagent-driven | Task 1: PromptContext + PromptSection ABC（4 测试） | - | 8b54201 |
+| 2026-07-23 17:50 | #task-18 | subagent-driven | Task 2: 6 Section 实现 + PromptComposer（11 新测试），含 B.2 Workflow 文本检查 | Code review: ToolSection 需防御性 .get() + 空 tools 返回 "" | fafb8eb, 346fc00 |
+| 2026-07-23 18:00 | #task-18 | subagent-driven | Task 3: WorkspaceCollector + WorkspaceSnapshot（8 测试），含 TTL 缓存 | - | 658a47d |
+| 2026-07-23 18:10 | #task-18 | subagent-driven | Task 4: ContextBuilder 集成 — prompt.py 简化、builder.py 重写、MemoryManager.get_rules()、state_machine 接线（7 测试） | - | 9399a39 |
+| 2026-07-23 18:15 | #task-18 | subagent-driven | Task 5: Renderer ABC + TerminalRenderer 增强 — on_token_usage/on_timing、可配置截断、on_stop 汇总（9 测试） | - | 065115c |
+| 2026-07-23 18:20 | #task-18 | subagent-driven | Task 6: Trace 增强 — Event timestamp/elapsed_ms、Tracer record_token/replay_filtered（已在前期提交中实现） | - | - |
+| 2026-07-23 18:30 | #task-18 | verify | 128 测试全部通过，真实 LLM 端到端验证：写入 hello2.cpp → g++ 编译 → Hello AI4SE v2 ✅ | - | - |

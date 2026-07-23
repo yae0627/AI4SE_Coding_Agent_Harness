@@ -1,5 +1,5 @@
 from ai4se_agent.cli.renderer import NullRenderer, Renderer, TerminalRenderer
-from ai4se_agent.types import Action, GuardrailResult, StopReason, ToolResult
+from ai4se_agent.types import StopReason, ToolResult
 
 
 def test_null_renderer_does_nothing():

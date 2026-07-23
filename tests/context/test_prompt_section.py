@@ -3,6 +3,13 @@ import pytest
 from ai4se_agent.context.prompt_context import PromptContext
 from ai4se_agent.context.prompt_section import PromptSection
 from ai4se_agent.context.workspace import WorkspaceSnapshot
+from ai4se_agent.context.prompt_composer import PromptComposer
+from ai4se_agent.context.sections.system_role import SystemRoleSection
+from ai4se_agent.context.sections.tool_section import ToolSection
+from ai4se_agent.context.sections.format_section import FormatSection
+from ai4se_agent.context.sections.example_section import ExampleSection
+from ai4se_agent.context.sections.workspace_section import WorkspaceSection
+from ai4se_agent.context.sections.rules_section import RulesSection
 
 
 class _TestSection(PromptSection):
@@ -54,15 +61,6 @@ def test_sections_do_not_mutate_context():
 def test_prompt_section_cannot_instantiate():
     with pytest.raises(TypeError):
         PromptSection()  # type: ignore[abstract]
-
-
-from ai4se_agent.context.prompt_composer import PromptComposer
-from ai4se_agent.context.sections.system_role import SystemRoleSection
-from ai4se_agent.context.sections.tool_section import ToolSection
-from ai4se_agent.context.sections.format_section import FormatSection
-from ai4se_agent.context.sections.example_section import ExampleSection
-from ai4se_agent.context.sections.workspace_section import WorkspaceSection
-from ai4se_agent.context.sections.rules_section import RulesSection
 
 
 def test_system_role_section():

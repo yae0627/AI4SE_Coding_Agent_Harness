@@ -258,3 +258,73 @@ core/state_machine.py    ← 修改：添加 Renderer/Tracer 回调注入
 
 - **测试**: 85 个单元测试全部通过（新增 21 个）
 - **真实 API**: `ai4se-agent "write a C++ merge sort program"` → 写文件、编译、运行成功
+
+## 阶段六：Context Engineering & Observability（2026-07-23）
+
+### 背景
+
+Action Protocol Migration 完成后，系统 prompt 仍是巨石字符串，Renderer 输出截断过于激进，Trace 缺少时间维度。用户提出两个独立增强 track：
+
+- **B. Context Engineering**：Prompt 拆分 → Workflow 优化 → Workspace Context 动态注入
+- **C. Observability**：Renderer token/timing 统计 → Trace timestamp/elapsed_ms → 结构化回放
+
+### 架构决策
+
+| 决策点 | 选项 | 最终选择 | 理由 |
+|--------|------|---------|------|
+| Prompt 模块化 | 单文件多函数 / 一文件一段 / **组合模式** | **PromptComposer + 6 Section 组件** | 每个 section 独立测试、独立演进，统一 PromptContext 数据契约 |
+| Section 接口 | `build(**kwargs)` / **`build(ctx: PromptContext)`** | **PromptContext 数据载体** | 类型安全，新增 section 不需改 Composer |
+| Workspace 采集 | 内联到 ContextBuilder / **独立 WorkspaceCollector** | **独立 Collector + 5s TTL 缓存** | 单一职责，缓存避免每轮重复扫描 |
+| Renderer 增强 | 硬编码截断 / **可配置 + ABC 扩展** | **on_token_usage/on_timing + max_output** | 保持向后兼容，NullRenderer 同步更新 |
+| 执行方式 | Inline / **Subagent-Driven** | **Subagent-Driven（7 Tasks）** | B+C 独立 track，task 间两阶段 review |
+
+### 关键迭代：用户推翻/修正的决策
+
+- **Section 组合方式**：初始方案为简单"一文件一字符串"，用户要求改为 `PromptSection` ABC + `PromptComposer` 组合模式，统一 `build(ctx: PromptContext)` 协议
+- **Renderer 截断**：初始为固定 200/300 字符，用户要求 `max_output` 可配置参数
+- **Trace 回放**：初始只有 `replay(path)` 全量回放，用户要求 `replay_filtered(event_type=, min_iteration=)` 结构化过滤
+- **Config 部署问题**：用户从仓库根目录运行 `ai4se-agent` 报 API key 缺失——确认为部署问题（CWD 不在 projects/），非代码 bug，不修改 ConfigLoader
+
+### 实现概览
+
+| Task | 模块 | 变更 | 测试数 |
+|------|------|------|--------|
+| 1 | PromptContext + PromptSection ABC | 新增数据载体 + 抽象协议 | 5 |
+| 2 | 6 Section + PromptComposer | SystemRole/Tool/Format/Example/Workspace/Rules + 编排器 | 16 |
+| 3 | WorkspaceCollector | OS/文件/git/时间 采集 + TTL 缓存 | 8 |
+| 4 | ContextBuilder 集成 | prompt.py 简化、builder.py 重写、MemoryManager.get_rules() | 7 |
+| 5 | Renderer 增强 | on_token_usage/on_timing、可配置截断、on_stop 汇总 | 9 |
+| 6 | Trace 增强 | Event timestamp/elapsed_ms、Tracer record_token/replay_filtered | 11 |
+| 7 | 全量验证 | 端到端测试 + 真实 LLM 验证 | - |
+
+### 最终架构
+
+```
+context/
+├── prompt_context.py     PromptContext dataclass（数据契约）
+├── prompt_section.py     PromptSection ABC（统一协议）
+├── prompt_composer.py    PromptComposer（编排器）
+├── sections/             6 个 Section 实现
+│   ├── system_role.py    "You are a coding agent..."
+│   ├── tool_section.py   ctx.tools → 工具列表
+│   ├── format_section.py JSON 格式 + 转义规则
+│   ├── example_section.py 少样本示例
+│   ├── workspace_section.py ctx.workspace → OS/文件/git
+│   └── rules_section.py  ctx.rules → 项目规则
+├── workspace.py          WorkspaceCollector + WorkspaceSnapshot
+├── prompt.py             (简化) 仅 build_tool_descriptions()
+└── builder.py            ContextBuilder：组装 PromptComposer + WorkspaceCollector
+
+cli/
+└── renderer.py           + on_token_usage / on_timing / max_output
+
+observability/
+├── events.py             + timestamp / elapsed_ms
+└── tracer.py             + record_token / replay_filtered
+```
+
+### 验证结果
+
+- **测试**: 128 个单元测试全部通过（Phase A 后 90 个 + 新增 38 个）
+- **真实 API**: `ai4se-agent "write hello2.cpp that prints Hello AI4SE v2 and compile it"` → 写入 → g++ 编译 → `Hello AI4SE v2` ✅
+- **Code Review**: 每个 Task 通过 spec compliance + code quality 两阶段 review，发现并修复 ToolSection 防御性 .get()、测试命名等 4 个问题

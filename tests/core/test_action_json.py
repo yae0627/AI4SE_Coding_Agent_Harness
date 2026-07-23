@@ -1,4 +1,3 @@
-import json
 from ai4se_agent.core.action import ActionParser, ActionValidator
 from ai4se_agent.types import Action
 
