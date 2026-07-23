@@ -23,8 +23,8 @@ class AgentEvent:
     def from_dict(cls, data: dict) -> "AgentEvent":
         return cls(
             type=data["type"],
+            iteration=data["iteration"],
+            state=data["state"],
             timestamp=data.get("timestamp", 0.0),
-            iteration=data.get("iteration", 0),
-            state=data.get("state", ""),
             payload=data.get("payload", {}),
         )

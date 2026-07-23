@@ -12,4 +12,7 @@ class EventBus:
 
     def publish(self, event: AgentEvent) -> None:
         for handler in self._handlers.get(event.type, []):
-            handler(event)
+            try:
+                handler(event)
+            except Exception:
+                pass

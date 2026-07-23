@@ -52,3 +52,19 @@ def test_subscribe_same_handler_multiple_types():
     bus.publish(AgentEvent(type="TOOL_START", iteration=1, state="TOOL_EXEC", payload={}))
     bus.publish(AgentEvent(type="TOOL_END", iteration=1, state="TOOL_EXEC", payload={}))
     assert results == ["TOOL_START", "TOOL_END"]
+
+
+def test_crashing_handler_does_not_block_others():
+    bus = EventBus()
+    results: list[str] = []
+
+    def bad_handler(event: AgentEvent) -> None:
+        raise RuntimeError("boom")
+
+    def good_handler(event: AgentEvent) -> None:
+        results.append("good")
+
+    bus.subscribe("TOOL_START", bad_handler)
+    bus.subscribe("TOOL_START", good_handler)
+    bus.publish(AgentEvent(type="TOOL_START", iteration=1, state="TOOL_EXEC", payload={}))
+    assert results == ["good"]

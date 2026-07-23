@@ -46,3 +46,17 @@ def test_agent_event_from_dict():
     assert event.type == "LLM_END"
     assert event.iteration == 3
     assert event.payload["tokens"] == 500
+
+
+def test_agent_event_round_trip():
+    original = AgentEvent(
+        type="TOOL_END",
+        iteration=5,
+        state="TOOL_EXEC",
+        payload={"tool": "shell", "success": True},
+    )
+    restored = AgentEvent.from_dict(original.to_dict())
+    assert restored.type == original.type
+    assert restored.iteration == original.iteration
+    assert restored.state == original.state
+    assert restored.payload == original.payload
