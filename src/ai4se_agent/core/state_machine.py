@@ -1,6 +1,6 @@
 # src/ai4se_agent/core/state_machine.py
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 from transitions import Machine
 from ai4se_agent.cli.renderer import NullRenderer, Renderer
 from ai4se_agent.context.builder import ContextBuilder
@@ -21,6 +21,9 @@ from ai4se_agent.observability.tracer import NullTracer, Tracer
 from ai4se_agent.tools.registry import ToolRegistry
 from ai4se_agent.core.events import AgentEvent
 from ai4se_agent.types import Action, GuardrailResult, StopReason, ToolResult
+
+if TYPE_CHECKING:
+    from ai4se_agent.core.event_bus import EventBus
 
 
 class HarnessStateMachine:

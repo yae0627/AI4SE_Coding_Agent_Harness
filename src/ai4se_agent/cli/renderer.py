@@ -1,8 +1,12 @@
 import shutil
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from ai4se_agent.core.events import AgentEvent
 from ai4se_agent.types import Action, GuardrailResult, StopReason, ToolResult
+
+if TYPE_CHECKING:
+    from ai4se_agent.core.event_bus import EventBus
 
 
 class Renderer(ABC):

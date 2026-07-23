@@ -1,5 +1,12 @@
-from ai4se_agent.core.events import AgentEvent
+from ai4se_agent.core.action import ActionParser, ActionValidator
+from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.core.event_bus import EventBus
+from ai4se_agent.core.events import AgentEvent
+from ai4se_agent.core.state_machine import HarnessStateMachine
+from ai4se_agent.guardrails.engine import GuardrailEngine
+from ai4se_agent.llm.mock_adapter import MockAdapter
+from ai4se_agent.memory.manager import MemoryManager
+from ai4se_agent.tools.registry import ToolRegistry
 
 
 def test_subscribe_and_publish():
@@ -68,15 +75,6 @@ def test_crashing_handler_does_not_block_others():
     bus.subscribe("TOOL_START", good_handler)
     bus.publish(AgentEvent(type="TOOL_START", iteration=1, state="TOOL_EXEC", payload={}))
     assert results == ["good"]
-
-
-from ai4se_agent.core.state_machine import HarnessStateMachine
-from ai4se_agent.core.agent_state import AgentState
-from ai4se_agent.llm.mock_adapter import MockAdapter
-from ai4se_agent.core.action import ActionParser, ActionValidator
-from ai4se_agent.tools.registry import ToolRegistry
-from ai4se_agent.guardrails.engine import GuardrailEngine
-from ai4se_agent.memory.manager import MemoryManager
 
 
 def test_state_machine_emits_events():

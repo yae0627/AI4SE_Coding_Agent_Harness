@@ -1,4 +1,8 @@
+import io
+import sys
+
 from ai4se_agent.cli.renderer import NullRenderer, Renderer, TerminalRenderer
+from ai4se_agent.core.events import AgentEvent
 from ai4se_agent.types import StopReason, ToolResult
 
 
@@ -73,9 +77,6 @@ def test_terminal_renderer_truncates_long_output(capsys):
     assert len(last_line) <= 60
 
 
-from ai4se_agent.core.events import AgentEvent
-
-
 def test_renderer_handles_tool_start_event(capsys):
     r = TerminalRenderer()
     event = AgentEvent(
@@ -121,9 +122,8 @@ def test_renderer_handles_llm_end_event(capsys):
 
 def test_renderer_subscribe_registers_handlers():
     from ai4se_agent.core.event_bus import EventBus
-    import sys, io
     bus = EventBus()
-    r = TerminalRenderer(event_bus=bus)
+    TerminalRenderer(event_bus=bus)
     captured = io.StringIO()
     old_stdout = sys.stdout
     sys.stdout = captured
