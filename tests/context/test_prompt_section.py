@@ -1,3 +1,5 @@
+import pytest
+
 from ai4se_agent.context.prompt_context import PromptContext
 from ai4se_agent.context.prompt_section import PromptSection
 from ai4se_agent.context.workspace import WorkspaceSnapshot
@@ -42,9 +44,13 @@ def test_section_protocol():
     assert "Goal: hi" in result
 
 
-def test_prompt_context_immutable_pattern():
-    """PromptContext fields should not be mutated by sections."""
+def test_sections_do_not_mutate_context():
     ctx = PromptContext(tools=[{"name": "x"}], goal="test")
     original_tools = list(ctx.tools)
     _TestSection().build(ctx)
     assert ctx.tools == original_tools
+
+
+def test_prompt_section_cannot_instantiate():
+    with pytest.raises(TypeError):
+        PromptSection()  # type: ignore[abstract]
