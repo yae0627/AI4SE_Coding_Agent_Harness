@@ -63,3 +63,14 @@
 | 2026-07-23 18:15 | #task-18 | subagent-driven | Task 5: Renderer ABC + TerminalRenderer 增强 — on_token_usage/on_timing、可配置截断、on_stop 汇总（9 测试） | - | 065115c |
 | 2026-07-23 18:20 | #task-18 | subagent-driven | Task 6: Trace 增强 — Event timestamp/elapsed_ms、Tracer record_token/replay_filtered（已在前期提交中实现） | - | - |
 | 2026-07-23 18:30 | #task-18 | verify | 128 测试全部通过，真实 LLM 端到端验证：写入 hello2.cpp → g++ 编译 → Hello AI4SE v2 ✅ | - | - |
+| 2026-07-23 19:00 | #task-19 | brainstorming | 设计部署优化：用户级持久化配置、setup wizard、模型切换、LLMManager | 用户提出三层设计决策：XDG 配置目录、TOML 格式、/config + /models 命令 | - |
+| 2026-07-23 19:30 | #task-19 | implementation | 部署优化实现：AppConfig dataclass、TOML 三级加载、LLMManager、setup wizard、/config + /models 命令、Workspace 绝对路径 | 迁移 .env → ~/.config/ai4se/config.toml，跨目录运行验证通过 | 5593036 |
+| 2026-07-23 20:00 | #task-20 | brainstorming | 设计 Phase 1 交互优化：Session + Event Bus 架构 | 用户确定 A→B→C 四阶段路线，Phase 1 先做 Session + Event Bus，不改 Renderer 输出 | - |
+| 2026-07-23 20:30 | #task-20 | writing-plans | 生成 7-Task 实现计划：Event 基础设施 → MessageHistory → Session → StateMachine emit → Renderer 订阅 → CLI 连线 → 全量验证 | 关键设计决策：Session 持有永久 history，AgentRuntime 每轮临时创建；14 个事件类型，中粒度 + 细粒度 payload | b7e356a |
+| 2026-07-23 21:00 | #task-20 | subagent-driven | Task 1: AgentEvent + EventBus（11 测试） | Code review: 修复 handler 异常隔离、from_dict 一致性、round-trip 测试 | 36cf8ed |
+| 2026-07-23 21:10 | #task-20 | subagent-driven | Task 2: MessageHistory（8 测试） | - | 175c377 |
+| 2026-07-23 21:20 | #task-20 | subagent-driven | Task 3: Session + AgentRuntime（5 测试） | Session.send() 每轮创建临时 AgentRuntime，永久持有 history | 7f421d4 |
+| 2026-07-23 21:30 | #task-20 | subagent-driven | Task 4: StateMachine emit() 集成（2 测试） | 每个 _on_* 增加 emit()，event_bus=None 时 no-op，向后兼容 | ✓ |
+| 2026-07-23 21:40 | #task-20 | subagent-driven | Task 5: TerminalRenderer 订阅 EventBus（5 测试） | 现有 on_* 方法保持不变，新增 _on_* handler 方法，输出格式不变 | ✓ |
+| 2026-07-23 21:50 | #task-20 | subagent-driven | Task 6: CLI Session 连线 — interactive() 用 Session.send() | submit() 单次模式不变，向后兼容 | ✓ |
+| 2026-07-23 22:00 | #task-20 | verify | 162 测试全部通过，ruff clean，mock E2E + interactive 验证通过 | - | de1fa88 |

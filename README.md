@@ -6,7 +6,7 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 
 ## 项目状态
 
-✅ **已完成** — 69 个测试通过，mypy 零错误，真实 API 端到端验证通过。
+✅ **已完成** — 162 个测试通过，ruff 零告警，真实 API 端到端验证通过。
 
 ## 架构
 
@@ -14,27 +14,39 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 src/ai4se_agent/
 ├── types.py              # 共享类型（Action, ToolResult, Feedback, GuardrailResult 等）
 ├── cli/
-│   ├── main.py           # CLI 入口（argparse）
+│   ├── main.py           # CLI 入口（argparse, --verbose, --trace, --setup）
 │   ├── session.py        # SessionManager：交互循环、会话管理
-│   ├── renderer.py       # Renderer ABC + TerminalRenderer + NullRenderer
-│   └── commands.py       # 交互命令（/status, /reset, /verbose）
+│   ├── renderer.py       # Renderer ABC + TerminalRenderer + NullRenderer（事件驱动）
+│   └── commands.py       # 交互命令（/status, /reset, /verbose, /config, /models）
 ├── config/
-│   └── loader.py         # 配置加载（.env 支持）
+│   ├── schema.py         # AppConfig dataclass（provider/model/agent 三级配置）
+│   ├── loader.py         # 三级加载（env vars → ./ai4se.toml → ~/.config/ai4se/ → defaults）
+│   └── wizard.py         # 首次部署交互式引导 + /v1/models 发现
 ├── context/
+│   ├── prompt_context.py # PromptContext 数据载体
+│   ├── prompt_section.py # PromptSection ABC
+│   ├── prompt_composer.py# PromptComposer 编排器
+│   ├── sections/         # 6 个 Section 组件（SystemRole/Tool/Format/Example/Workspace/Rules）
+│   ├── workspace.py      # WorkspaceCollector + WorkspaceSnapshot（TTL 缓存）
 │   ├── builder.py        # ContextBuilder：动态组装 LLM 输入
-│   └── prompt.py         # system prompt 模板（工具列表动态注入）
+│   └── prompt.py         # build_tool_descriptions() 工具函数
 ├── core/
 │   ├── agent_state.py    # AgentState 数据模型
-│   ├── action.py         # ActionParser + ActionValidator
-│   └── state_machine.py  # 11 状态 FSM 主循环
+│   ├── action.py         # ActionParser（JSON + legacy）+ ActionValidator（schema 驱动）
+│   ├── events.py         # AgentEvent dataclass（14 事件类型）
+│   ├── event_bus.py      # EventBus（subscribe/publish）
+│   └── state_machine.py  # 11 状态 FSM 主循环（含 EventBus emit）
+├── session/
+│   ├── history.py        # MessageHistory（跨轮次对话记忆）
+│   └── session.py        # Session + AgentRuntime（每轮临时 Runtime，永久 history）
 ├── llm/
 │   ├── base.py           # LLMAdapter ABC
 │   ├── openai_adapter.py # OpenAI 适配器
-│   ├── local_adapter.py  # 本地模型适配器（OpenAI 兼容）
+│   ├── manager.py        # LLMManager（adapter 工厂 + runtime reload）
 │   └── mock_adapter.py   # Mock 适配器（测试用）
 ├── tools/
-│   ├── base.py           # Tool ABC
-│   ├── registry.py       # 工具注册表
+│   ├── base.py           # Tool ABC + schema 属性
+│   ├── registry.py       # 工具注册表 + list_schemas()
 │   ├── read_file.py      # 读文件
 │   ├── write_file.py     # 写文件
 │   ├── edit_file.py      # 局部编辑
@@ -48,28 +60,42 @@ src/ai4se_agent/
 │   ├── workspace_policy.py # 路径逃逸拦截
 │   └── git_policy.py     # 高风险 git 操作拦截
 ├── feedback/
-│   ├── sensor.py         # Sensor ABC + Test/Lint/TypeSensor
+│   ├── sensor.py         # Sensor ABC + Test/Lint Sensor
 │   ├── classifier.py     # FailureClassifier（规则驱动）
 │   ├── planner.py        # CorrectionPlanner
 │   ├── failure_db.py     # FailureDB (SQLite)
 │   └── loop.py           # FeedbackLoop 编排器
 ├── memory/
-│   ├── manager.py        # 记忆管理器
+│   ├── manager.py        # 记忆管理器（含 get_rules()）
 │   ├── session.py        # 运行时记忆（deque）
 │   └── persistent.py     # 持久化记忆（文件存储）
 └── observability/
-    ├── events.py          # 事件类型（STATE_CHANGED, LLM_CALLED 等）
-    └── tracer.py          # Tracer：JSON trace 记录与回放
+    ├── events.py          # 事件类型 + timestamp/elapsed_ms
+    └── tracer.py          # Tracer：record_token, replay_filtered
 ```
 
 ## 状态机
 
-11 状态 FSM（`transitions` 库）：
+11 状态 FSM（`transitions` 库），事件驱动输出：
 
 ```
-IDLE → CONTEXT_ORG → LLM_CALL → ACTION_PARSE → GUARDRAIL → 
-WAIT_APPROVAL → TOOL_EXEC → [TOOL_ERROR | FEEDBACK] → 
-MEMORY_UPDATE → [STOP | CONTEXT_ORG]
+                 IDLE
+                   │
+            CONTEXT_ORG
+                   │
+              LLM_CALL ──── LLM_START/END events
+                   │
+           ACTION_PARSE ──── ACTION_CREATED event
+                   │
+              GUARDRAIL ──── GUARDRAIL_PASS/DENY, APPROVAL_REQUIRED events
+                   │
+             TOOL_EXEC ──── TOOL_START/END events
+                   │
+              FEEDBACK ──── FEEDBACK_COMPLETED event
+                   │
+          MEMORY_UPDATE ──── MEMORY_WRITE event
+                   │
+                 STOP ──── AGENT_STOP event
 ```
 
 ## 快速开始
@@ -78,39 +104,51 @@ MEMORY_UPDATE → [STOP | CONTEXT_ORG]
 # 安装依赖
 pip install -e ".[dev]"
 
-# 配置 API Key（首次运行）
-cp .env.example .env
-# 编辑 .env 填入你的 OPENAI_API_KEY 和 OPENAI_MODEL
+# 首次运行 — 交互式配置引导
+ai4se-agent --setup
+# 或直接启动交互模式（自动检测无配置时进入引导）
+ai4se-agent
+```
+
+### 配置管理
+
+配置存储在 `~/.config/ai4se/config.toml`（Linux/macOS）或 `%APPDATA%/ai4se/config.toml`（Windows），从任意目录运行均可加载。
+
+```toml
+[provider]
+name = "openai"
+api_key = "sk-..."
+base_url = "https://api.openai.com/v1"
+
+[model]
+active = "gpt-4o"
+
+[agent]
+max_iterations = 20
 ```
 
 ### 单次任务模式
 
 ```bash
-# 运行单次任务
 ai4se-agent "你的任务描述"
-
-# 查看详细输出（LLM 请求/响应、工具结果）
-ai4se-agent --verbose "你的任务描述"
-
-# 保存 JSON trace 到 sessions/ 目录
-ai4se-agent --trace "你的任务描述"
-
-# 使用 Mock 模式（无需真实 LLM，体验流程）
-ai4se-agent --provider mock "测试任务"
+ai4se-agent --verbose "你的任务描述"      # 详细输出
+ai4se-agent --trace "你的任务描述"        # 保存 JSON trace
 ```
 
 ### 交互式会话模式
 
 ```bash
-# 无参数启动交互模式
-ai4se-agent
+ai4se-agent    # 无参数启动交互模式
 ```
 
 交互模式支持以下命令：
 
 | 命令 | 用途 |
 |------|------|
-| `你的任务描述` | 提交任务给 agent |
+| `你的任务描述` | 提交任务给 agent（跨轮次保留对话历史） |
+| `/config` | 查看当前配置 |
+| `/config set model active <name>` | 切换模型（即时生效） |
+| `/models` | 列出 API 可用模型 |
 | `/status` | 查看当前状态和迭代次数 |
 | `/verbose` | 切换详细输出模式 |
 | `/reset` | 清空当前会话 |
@@ -119,21 +157,30 @@ ai4se-agent
 ### 输出示例
 
 ```
+Workspace: C:\Users\...\AI4SE\projects
+Model: deepseek-v4-flash
+Provider: openai
+
+> write a Python script that prints Fibonacci(20)
+
 [CONTEXT_ORG] Iteration 1
-  action: shell({'command': 'pytest'})
+  action: write_file({'path': 'fibo.py', 'content': 'def fib(n):...'})
   guardrail: all -> ALLOW
   result: OK
   feedback: success
 [CONTEXT_ORG] Iteration 2
-STOP: success after 2 iterations
-Result: success (success) after 2 iterations
+  action: shell({'command': 'python fibo.py'})
+  guardrail: all -> ALLOW
+  result: OK
+  feedback: success
+STOP: success | 2 iters | 0 tokens | 0.0s
+Result: success (success)
 ```
 
 ## 运行测试
 
 ```bash
-pytest -v           # 69 个测试
-mypy src/           # 类型检查
+pytest -v           # 162 个测试
 ruff check src/     # Lint 检查
 ```
 
@@ -146,31 +193,35 @@ python demo/mechanism_demo.py
 演示 5 个核心机制：
 1. 护栏拦截危险命令（`rm -rf /`）
 2. 反馈闭环检测失败并生成修正计划
-3. 增量修正策略（3 次失败后升级全量重规划）
+3. 增量修正策略（3 次失败后升级）
 4. FailureDB 持久化失败模式
 5. WorkspacePolicy 拦截路径逃逸
 
 ## 重点维度：反馈闭环
 
 ```
-Sensor (TestSensor / LintSensor / TypeSensor)
+Sensor (TestSensor / LintSensor)
   → Feedback (success, category, message, source, severity)
   → FailureClassifier (规则驱动，非 LLM)
   → CorrectionPlanner (生成修正建议，不直接修代码)
   → FailureDB (SQLite 持久化失败模式)
 ```
 
-- ✅ 反馈信号是代码机制，不是 Prompt
-- ✅ 移除真实 LLM 后可以单测
-- ✅ 有客观校验器（pytest / ruff / mypy）
-- ✅ 有失败分类（AssertionError → logic_error 等）
-- ✅ 有修正策略生成（CorrectionPlan）
-- ✅ 能回灌 Agent Loop
+## 工程亮点
+
+| 维度 | 实现 |
+|------|------|
+| **Context Engineering** | PromptComposer + 6 Section 组件，WorkspaceContext 动态注入（OS/文件/git/时间） |
+| **Action Protocol** | JSON-first 解析器 + legacy 回退 + JSON repair（修复 LLM 转义错误） |
+| **Event Bus** | 14 事件类型，FSM → EventBus → Renderer 解耦，subscribe/publish 模式 |
+| **Session Layer** | 跨轮次 MessageHistory，每轮临时 AgentRuntime 隔离 |
+| **配置系统** | TOML 三级加载（env vars → 项目 → 用户 → 默认），setup wizard + /v1/models 发现 |
+| **LLM Manager** | adapter 工厂 + runtime model switch，即时生效 |
+| **可观测性** | Trace timestamp/elapsed_ms，replay_filtered 结构化回放 |
 
 ## 安全边界
 
-- API Key 通过 `.env` 文件存储，`getpass` 隐藏输入引导
-- `.env` 已加入 `.gitignore`，绝不提交 Git
+- API Key 通过 `~/.config/ai4se/config.toml` 存储
 - 危险命令拦截为代码机制（CommandPolicy），非 Prompt 约束
 - 文件操作限制在 workspace 内（WorkspacePolicy）
 - 路径逃逸检测（`../../` 写出 workspace 被拦截）
@@ -180,21 +231,23 @@ Sensor (TestSensor / LintSensor / TypeSensor)
 | 维度 | 选择 |
 |------|------|
 | 语言 | Python 3.10+ |
-| LLM 供应商 | OpenAI + 兼容格式本地模型（可切换） |
+| LLM 供应商 | OpenAI + 兼容格式（可切换） |
 | 状态机 | `transitions` |
 | 测试 | pytest |
 | Lint | ruff |
-| 类型检查 | mypy |
 | CLI | colorama |
 | CI/CD | GitHub Actions + .gitlab-ci.yml |
 
-## 分发
+## 设计文档
 
-- PyPI: `pip install ai4se-agent`
-- [设计文档](docs/superpowers/specs/2026-07-21-coding-agent-harness-design.md)
-- [实现计划](docs/superpowers/plans/2026-07-21-coding-agent-harness-plan.md)
-- [CLI 表现层设计](docs/superpowers/specs/2026-07-22-observable-cli-design.md)
+| 阶段 | Spec | Plan |
+|------|------|------|
+| 核心 Harness | [design](docs/superpowers/specs/2026-07-21-coding-agent-harness-design.md) | [plan](docs/superpowers/plans/2026-07-21-coding-agent-harness-plan.md) |
+| CLI 表现层 | [design](docs/superpowers/specs/2026-07-22-observable-cli-design.md) | [plan](docs/superpowers/plans/2026-07-22-observable-cli-plan.md) |
+| Action Protocol 迁移 | [design](docs/superpowers/specs/2026-07-23-action-protocol-migration-design.md) | [plan](docs/superpowers/plans/2026-07-23-action-protocol-migration-plan.md) |
+| Context + Observability | [design](docs/superpowers/specs/2026-07-23-context-observability-design.md) | [plan](docs/superpowers/plans/2026-07-23-context-observability-plan.md) |
+| Session + Event Bus | [design](docs/superpowers/specs/2026-07-23-session-event-bus-design.md) | [plan](docs/superpowers/plans/2026-07-23-session-event-bus-plan.md) |
 
 ## 项目课程
 
-本项目使用 [Superpowers](https://github.com/obra/superpowers) 框架开发，遵循 `brainstorming → writing-plans → using-git-worktrees → subagent-driven-development → test-driven-development → requesting-code-review → finishing-a-development-branch` 工作流。
+本项目使用 [Superpowers](https://github.com/obra/superpowers) 框架开发，遵循 `brainstorming → writing-plans → subagent-driven-development → test-driven-development → requesting-code-review → finishing-a-development-branch` 工作流。

@@ -328,3 +328,82 @@ observability/
 - **测试**: 128 个单元测试全部通过（Phase A 后 90 个 + 新增 38 个）
 - **真实 API**: `ai4se-agent "write hello2.cpp that prints Hello AI4SE v2 and compile it"` → 写入 → g++ 编译 → `Hello AI4SE v2` ✅
 - **Code Review**: 每个 Task 通过 spec compliance + code quality 两阶段 review，发现并修复 ToolSection 防御性 .get()、测试命名等 4 个问题
+
+## 阶段七：部署优化（2026-07-23）
+
+### 背景
+
+用户从仓库根目录运行 `ai4se-agent` 报 API key 缺失——`ConfigLoader` 只在 CWD 找 `.env`。需要让配置跟随 agent 安装位置，而非运行目录。
+
+### 架构决策
+
+| 决策点 | 选择 | 理由 |
+|--------|------|------|
+| 配置存储 | `~/.config/ai4se/config.toml`（XDG） | 长期安装的软件，不是项目脚本 |
+| 配置格式 | TOML（替代 .env） | 支持嵌套结构（provider/model/agent），易扩展 |
+| 加载链 | env vars → `./ai4se.toml` → `~/.config/ai4se/` → 包默认 | 三级覆盖，类似 `git config` |
+| 模型切换 | LLMManager + `/config set model` | adapter 工厂 + runtime reload，即时生效 |
+| 首次引导 | `isatty()` 自动检测 + `--setup` flag | 交互环境自动 wizard，CI/非交互打印提示 |
+
+### 新增模块
+
+```
+config/
+├── schema.py         AppConfig dataclass
+├── loader.py         TOML 三级加载 + env var 覆盖
+└── wizard.py         交互式引导 + /v1/models 发现
+
+llm/
+└── manager.py        LLMManager（adapter 工厂 + switch_model）
+```
+
+### 验证结果
+
+- **131 测试全部通过**，从 home 目录运行 `ai4se-agent` 正常加载配置
+- **真实 API**：`ai4se-agent "write hello3.cpp..."` → 写入 → 编译 → `Deployment OK` ✅
+
+## 阶段八：Session & Event Bus（2026-07-23）
+
+### 背景
+
+当前交互模式每次 `submit()` 创建新 `AgentState`，轮次之间零记忆。状态机直接 `print()` 输出，Agent 内核与终端耦合。
+
+### 架构决策
+
+| 决策点 | 选择 | 理由 |
+|--------|------|------|
+| Session 模型 | Session 持有永久 history，AgentRuntime 每轮临时 | 避免 goal 与 history 语义冲突 |
+| 事件粒度 | 14 类型，中粒度 + 细粒度 payload | 状态机描述行为逻辑，Event 描述外部可观察行为 |
+| EventBus 接口 | `subscribe(type, handler)` + `publish(event)` | 解耦发射者与消费者，支持多订阅者 |
+| FSM 改动 | 每个 `_on_*` 增加 `emit()`，转移图不变 | 零风险，event_bus=None 时 no-op |
+| Renderer 迁移 | 旧 `on_*` 方法不变，新增 `_on_*` handler | 双路径共存，输出格式完全一致 |
+
+### 新增模块
+
+```
+core/
+├── events.py          AgentEvent dataclass（14 事件类型）
+└── event_bus.py       EventBus（subscribe/publish）
+
+session/
+├── history.py         MessageHistory（跨轮次对话记忆）
+└── session.py         Session + AgentRuntime
+```
+
+### 实现概览
+
+| Task | 模块 | 新增文件 | 测试 |
+|------|------|---------|------|
+| 1 | AgentEvent + EventBus | events.py, event_bus.py | 11 |
+| 2 | MessageHistory | history.py | 8 |
+| 3 | Session + AgentRuntime | session.py | 5 |
+| 4 | StateMachine emit() | (改 state_machine.py) | 2 |
+| 5 | TerminalRenderer 订阅 | (改 renderer.py) | 5 |
+| 6 | CLI Session 连线 | (改 cli/session.py) | — |
+| 7 | 全量验证 | lint 修复 | — |
+
+### 验证结果
+
+- **162 测试全部通过**，ruff clean
+- **Mock E2E**：单次任务 + 交互式多轮均正常
+- **Review 修复**：handler 异常隔离、from_dict 一致性、round-trip 测试等 8 个问题
