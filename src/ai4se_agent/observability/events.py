@@ -16,10 +16,18 @@ class EventType(Enum):
 class Event:
     type: EventType
     iteration: int
+    timestamp: str = ""
+    elapsed_ms: float = 0.0
     data: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        return {"type": self.type.value, "iteration": self.iteration, **self.data}
+        return {
+            "type": self.type.value,
+            "iteration": self.iteration,
+            "timestamp": self.timestamp,
+            "elapsed_ms": self.elapsed_ms,
+            **self.data,
+        }
 
 
 @dataclass

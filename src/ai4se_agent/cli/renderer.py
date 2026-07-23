@@ -31,6 +31,14 @@ class Renderer(ABC):
     def on_stop(self, reason: StopReason, iteration: int) -> None:
         pass
 
+    @abstractmethod
+    def on_token_usage(self, iteration: int, prompt_tokens: int, completion_tokens: int) -> None:
+        pass
+
+    @abstractmethod
+    def on_timing(self, state_name: str, elapsed_ms: float) -> None:
+        pass
+
 
 class NullRenderer(Renderer):
     def on_state_change(self, old_state: str, new_state: str, iteration: int) -> None:
@@ -53,10 +61,19 @@ class NullRenderer(Renderer):
     def on_stop(self, reason: StopReason, iteration: int) -> None:
         pass
 
+    def on_token_usage(self, iteration: int, prompt_tokens: int, completion_tokens: int) -> None:
+        pass
+
+    def on_timing(self, state_name: str, elapsed_ms: float) -> None:
+        pass
+
 
 class TerminalRenderer(Renderer):
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False, max_output: int = 500):
         self._verbose = verbose
+        self._max_output = max_output
+        self._total_tokens: int = 0
+        self._total_elapsed_ms: float = 0.0
 
     def _print(self, line: str) -> None:
         width = shutil.get_terminal_size().columns
@@ -70,7 +87,8 @@ class TerminalRenderer(Renderer):
     def on_llm_call(self, iteration: int, model: str, response: str) -> None:
         if self._verbose:
             self._print(f"  model: {model}")
-            self._print(f"  response: {response[:200]}")
+            limit = 500 if self._verbose else 200
+            self._print(f"  response: {response[:limit]}")
 
     def on_action(
         self, iteration: int, action: Action, guardrail_result: GuardrailResult | None
@@ -85,7 +103,7 @@ class TerminalRenderer(Renderer):
         status = "OK" if result.success else "FAILED"
         self._print(f"  result: {status}")
         if self._verbose or not result.success:
-            self._print(f"  output: {result.output[:300]}")
+            self._print(f"  output: {result.output[:self._max_output]}")
 
     def on_feedback(self, iteration: int, has_plan: bool, plan_scope: str) -> None:
         if has_plan:
@@ -94,4 +112,16 @@ class TerminalRenderer(Renderer):
             self._print("  feedback: success")
 
     def on_stop(self, reason: StopReason, iteration: int) -> None:
-        self._print(f"STOP: {reason.value} after {iteration} iterations")
+        self._print(
+            f"STOP: {reason.value} | {iteration} iters | "
+            f"{self._total_tokens} tokens | {self._total_elapsed_ms / 1000:.1f}s"
+        )
+
+    def on_token_usage(self, iteration: int, prompt_tokens: int, completion_tokens: int) -> None:
+        self._total_tokens += prompt_tokens + completion_tokens
+        self._print(f"  token: {prompt_tokens}↑/{completion_tokens}↓")
+
+    def on_timing(self, state_name: str, elapsed_ms: float) -> None:
+        self._total_elapsed_ms += elapsed_ms
+        if self._verbose:
+            self._print(f"  [{state_name}] {elapsed_ms:.1f}ms")
