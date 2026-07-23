@@ -58,7 +58,9 @@ class HarnessStateMachine:
         self._pending_action: Optional[Action] = None
         self._pending_guardrail: Optional[GuardrailResult] = None
         self._last_tool_result: Optional[ToolResult] = None
-        self._context_builder = ContextBuilder(tool_registry=self.tools)
+        self._context_builder = ContextBuilder(
+            tool_registry=self.tools, workspace_root="."
+        )
         self._renderer = renderer
         self._tracer = tracer
 

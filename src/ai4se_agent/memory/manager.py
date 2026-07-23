@@ -12,3 +12,12 @@ class MemoryManager:
 
     def get_session_history(self) -> list:
         return self.session.get_all()
+
+    def get_rules(self) -> list[str]:
+        rule_names = self.persistent.list_rules()
+        rules = []
+        for name in rule_names:
+            content = self.persistent.load_rule(name)
+            if content:
+                rules.append(content.strip())
+        return rules
