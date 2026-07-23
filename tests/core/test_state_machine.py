@@ -1,13 +1,12 @@
-# tests/core/test_state_machine.py
 from ai4se_agent.core.state_machine import HarnessStateMachine
 from ai4se_agent.core.agent_state import AgentState
+from ai4se_agent.core.event_bus import EventBus
 from ai4se_agent.llm.mock_adapter import MockAdapter
 from ai4se_agent.core.action import ActionParser, ActionValidator
 from ai4se_agent.tools.registry import ToolRegistry
 from ai4se_agent.guardrails.engine import GuardrailEngine
 from ai4se_agent.memory.manager import MemoryManager
-from ai4se_agent.cli.renderer import NullRenderer
-from ai4se_agent.observability.tracer import NullTracer
+
 
 def test_state_machine_completes_successfully(tmp_path):
     llm = MockAdapter(responses=["action: read_file path=test.txt", "[DONE]"])
@@ -23,12 +22,14 @@ def test_state_machine_completes_successfully(tmp_path):
         guardrail_engine=guardrails,
         feedback_loop=None,
         memory_manager=MemoryManager(),
-        max_iterations=5
+        max_iterations=5,
+        event_bus=EventBus(),
     )
     result = machine.run()
     assert result["status"] in ("success", "failed")
 
-def test_state_machine_with_renderer():
+
+def test_state_machine_with_tracer():
     llm = MockAdapter(responses=["action: read_file path=test.txt", "[DONE]"])
     registry = ToolRegistry()
     guardrails = GuardrailEngine()
@@ -43,8 +44,7 @@ def test_state_machine_with_renderer():
         feedback_loop=None,
         memory_manager=MemoryManager(),
         max_iterations=5,
-        renderer=NullRenderer(),
-        tracer=NullTracer(),
+        event_bus=EventBus(),
     )
     result = machine.run()
     assert result["status"] in ("success", "failed")

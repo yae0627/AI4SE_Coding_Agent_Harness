@@ -2,7 +2,6 @@
 from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
 from transitions import Machine
-from ai4se_agent.cli.renderer import NullRenderer, Renderer
 from ai4se_agent.context.builder import ContextBuilder
 from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.core.action import ActionParser, ActionValidator
@@ -46,10 +45,9 @@ class HarnessStateMachine:
         guardrail_engine: GuardrailEngine,
         feedback_loop: FeedbackLoop | None,
         memory_manager: MemoryManager,
+        event_bus: "EventBus",
         max_iterations: int = 20,
-        renderer: Renderer = NullRenderer(),
         tracer: Tracer = NullTracer(),
-        event_bus: "EventBus | None" = None,
     ):
         self.state = agent_state
         self.llm = llm_adapter
@@ -67,7 +65,6 @@ class HarnessStateMachine:
         self._context_builder = ContextBuilder(
             tool_registry=self.tools, workspace_root=str(Path.cwd().resolve())
         )
-        self._renderer = renderer
         self._tracer = tracer
         self._event_bus = event_bus
 
@@ -107,10 +104,8 @@ class HarnessStateMachine:
         self.state.increment_iteration()
         if self.state.iteration > self.max_iterations:
             self.stop_reason = StopReason.MAX_ITERATION
-            self._renderer.on_state_change("CONTEXT_ORG", "STOP", self.state.iteration)
             self.stop()
             return
-        self._renderer.on_state_change("", "CONTEXT_ORG", self.state.iteration)
         self.call_llm()
 
     def _on_llm_call(self) -> None:
@@ -120,7 +115,6 @@ class HarnessStateMachine:
             response = self.llm.generate(messages)
             model = getattr(self.llm, "model", "")
             self._emit("LLM_END", {"model": model, "response_preview": response[:200]})
-            self._renderer.on_llm_call(self.state.iteration, model, response)
             self._tracer.record(
                 LLMEvent(self.state.iteration, model, messages, response)
             )
@@ -150,7 +144,6 @@ class HarnessStateMachine:
         action = result.action
         if action.name == "finish":
             self.stop_reason = StopReason.SUCCESS
-            self._renderer.on_state_change("ACTION_PARSE", "STOP", self.state.iteration)
             self.stop()
             return
         errors = self.validator.validate(action)
@@ -172,7 +165,6 @@ class HarnessStateMachine:
         assert self._pending_action is not None
         result = self.guardrails.check(self._pending_action)
         self._pending_guardrail = result
-        self._renderer.on_action(self.state.iteration, self._pending_action, result)
         self._tracer.record(
             GuardrailEvent(
                 self.state.iteration, result.verdict, result.policy, result.reason
@@ -207,9 +199,6 @@ class HarnessStateMachine:
         self._last_tool_result = result
         self._emit("TOOL_END", {"tool": self._pending_action.name, "success": result.success, "output_preview": result.output[:500]})
         self.state.record_turn(self._pending_action, result.output)
-        self._renderer.on_tool_exec(
-            self.state.iteration, self._pending_action.name, result
-        )
         self._tracer.record(
             ToolEvent(
                 self.state.iteration,
@@ -246,29 +235,24 @@ class HarnessStateMachine:
                 self.state.retry_count += 1
                 if self.state.retry_count >= 3:
                     self.state.retry_count = 0
-                self._renderer.on_feedback(self.state.iteration, True, plan.scope)
                 self._tracer.record(
                     FeedbackEvent(self.state.iteration, plan.scope, True)
                 )
                 self._emit("FEEDBACK_COMPLETED", {"has_plan": True, "scope": plan.scope})
                 self.feedback_correct()
                 return
-        self._renderer.on_feedback(self.state.iteration, False, "")
         self._tracer.record(FeedbackEvent(self.state.iteration, "", False))
         self._emit("FEEDBACK_COMPLETED", {"has_plan": False, "scope": ""})
         self.feedback_done()
 
     def _on_stop(self) -> None:
         self._emit("AGENT_STOP", {"reason": self.stop_reason.value, "iterations": self.state.iteration})
-        self._renderer.on_stop(self.stop_reason, self.state.iteration)
 
     def _on_memory_update(self) -> None:
         self._emit("MEMORY_WRITE", {})
         self.continue_loop()
 
     def _emit(self, event_type: str, payload: dict | None = None) -> None:
-        if self._event_bus is None:
-            return
         self._event_bus.publish(AgentEvent(
             type=event_type,
             iteration=self.state.iteration,

@@ -115,22 +115,3 @@ def test_state_machine_emits_events():
     assert "action_created" in events
     assert "tool_start" in events
     assert "agent_stop" in events
-
-
-def test_state_machine_no_event_bus_does_not_crash():
-    """Backward compat: StateMachine works without EventBus."""
-    llm = MockAdapter(responses=['{"action": "finish", "parameters": {}}'])
-    state = AgentState(goal="test")
-    machine = HarnessStateMachine(
-        agent_state=state,
-        llm_adapter=llm,
-        action_parser=ActionParser(),
-        action_validator=ActionValidator(),
-        tool_registry=ToolRegistry(),
-        guardrail_engine=GuardrailEngine(),
-        feedback_loop=None,
-        memory_manager=MemoryManager(),
-        max_iterations=3,
-    )
-    result = machine.run()
-    assert result["status"] in ("success", "failed")

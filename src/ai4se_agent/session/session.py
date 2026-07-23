@@ -83,9 +83,10 @@ class AgentRuntime:
             guardrail_engine=guardrails,
             feedback_loop=feedback,
             memory_manager=memory,
+            event_bus=self._event_bus or EventBus(),
         )
         result = machine.run()
-        self._emit("AGENT_STOP", payload={"reason": result["reason"], "iterations": result["iterations"]})
+        # AGENT_STOP is emitted by StateMachine._on_stop via EventBus
         return result
 
     def _emit(self, event_type: str, payload: dict | None = None) -> None:
