@@ -16,6 +16,7 @@ from ai4se_agent.guardrails.file_policy import FilePolicy
 from ai4se_agent.guardrails.git_policy import GitPolicy
 from ai4se_agent.guardrails.workspace_policy import WorkspacePolicy
 from ai4se_agent.llm.manager import LLMManager
+from ai4se_agent.core.events import AgentEvent
 from ai4se_agent.memory.manager import MemoryManager
 from ai4se_agent.memory.persistent import PersistentMemory
 from ai4se_agent.memory.session import SessionMemory
@@ -102,6 +103,25 @@ class SessionManager:
         return result
 
     def interactive(self) -> None:
+        from ai4se_agent.session.session import Session
+        from ai4se_agent.core.event_bus import EventBus
+
+        bus = EventBus()
+        # Wire renderer to event bus
+        if hasattr(self._renderer, '_on_tool_start'):
+            bus.subscribe("TOOL_START", self._renderer._on_tool_start)
+            bus.subscribe("TOOL_END", self._renderer._on_tool_end)
+            bus.subscribe("LLM_END", self._renderer._on_llm_end)
+            bus.subscribe("ACTION_CREATED", self._renderer._on_action_created)
+            bus.subscribe("GUARDRAIL_PASS", self._renderer._on_guardrail_pass)
+            bus.subscribe("GUARDRAIL_DENY", self._renderer._on_guardrail_deny)
+            bus.subscribe("FEEDBACK_COMPLETED", self._renderer._on_feedback_completed)
+            bus.subscribe("AGENT_STOP", self._renderer._on_agent_stop)
+
+        session = Session(config=self._config, event_bus=bus)
+        bus.publish(AgentEvent(type="SESSION_START", iteration=0, state="IDLE",
+                               payload={"session_id": session.id}))
+
         self.start()
         while True:
             try:
@@ -112,11 +132,14 @@ class SessionManager:
                     if not handle_command(line, self):
                         break
                     continue
-                result = self.submit(line)
+                result = session.send(line)
                 print(f"Result: {result['status']} ({result['reason']})")
             except (EOFError, KeyboardInterrupt):
                 print()
                 break
+
+        bus.publish(AgentEvent(type="SESSION_END", iteration=0, state="STOP",
+                               payload={"reason": "user_exit"}))
 
     def exit(self) -> None:
         print("Session ended")
