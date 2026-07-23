@@ -19,6 +19,7 @@ from ai4se_agent.observability.events import (
 )
 from ai4se_agent.observability.tracer import NullTracer, Tracer
 from ai4se_agent.tools.registry import ToolRegistry
+from ai4se_agent.core.events import AgentEvent
 from ai4se_agent.types import Action, GuardrailResult, StopReason, ToolResult
 
 
@@ -45,6 +46,7 @@ class HarnessStateMachine:
         max_iterations: int = 20,
         renderer: Renderer = NullRenderer(),
         tracer: Tracer = NullTracer(),
+        event_bus: "EventBus | None" = None,
     ):
         self.state = agent_state
         self.llm = llm_adapter
@@ -64,6 +66,7 @@ class HarnessStateMachine:
         )
         self._renderer = renderer
         self._tracer = tracer
+        self._event_bus = event_bus
 
         self.machine = Machine(
             model=self,
@@ -110,8 +113,10 @@ class HarnessStateMachine:
     def _on_llm_call(self) -> None:
         try:
             messages = self._context_builder.build(self.state)
+            self._emit("LLM_START", {"model": getattr(self.llm, "model", "")})
             response = self.llm.generate(messages)
             model = getattr(self.llm, "model", "")
+            self._emit("LLM_END", {"model": model, "response_preview": response[:200]})
             self._renderer.on_llm_call(self.state.iteration, model, response)
             self._tracer.record(
                 LLMEvent(self.state.iteration, model, messages, response)
@@ -154,6 +159,7 @@ class HarnessStateMachine:
             self.retry_parse()
             return
         self._pending_action = action
+        self._emit("ACTION_CREATED", {"action_name": action.name, "parameters": dict(action.parameters)})
         self._tracer.record(
             ActionEvent(self.state.iteration, action.name, action.parameters)
         )
@@ -170,10 +176,13 @@ class HarnessStateMachine:
             )
         )
         if result.verdict == "DENY":
+            self._emit("GUARDRAIL_DENY", {"policy": result.policy, "reason": result.reason})
             self.deny_action()
         elif result.verdict == "REQUIRE_APPROVAL":
+            self._emit("APPROVAL_REQUIRED", {"policy": result.policy, "reason": result.reason})
             self.request_approval()
         else:
+            self._emit("GUARDRAIL_PASS", {"policy": result.policy})
             self.execute()
 
     def _on_wait_approval(self) -> None:
@@ -190,8 +199,10 @@ class HarnessStateMachine:
 
     def _on_tool_exec(self) -> None:
         assert self._pending_action is not None
+        self._emit("TOOL_START", {"tool": self._pending_action.name, "parameters": dict(self._pending_action.parameters)})
         result = self.tools.execute(self._pending_action)
         self._last_tool_result = result
+        self._emit("TOOL_END", {"tool": self._pending_action.name, "success": result.success, "output_preview": result.output[:500]})
         self.state.record_turn(self._pending_action, result.output)
         self._renderer.on_tool_exec(
             self.state.iteration, self._pending_action.name, result
@@ -236,17 +247,31 @@ class HarnessStateMachine:
                 self._tracer.record(
                     FeedbackEvent(self.state.iteration, plan.scope, True)
                 )
+                self._emit("FEEDBACK_COMPLETED", {"has_plan": True, "scope": plan.scope})
                 self.feedback_correct()
                 return
         self._renderer.on_feedback(self.state.iteration, False, "")
         self._tracer.record(FeedbackEvent(self.state.iteration, "", False))
+        self._emit("FEEDBACK_COMPLETED", {"has_plan": False, "scope": ""})
         self.feedback_done()
 
     def _on_stop(self) -> None:
+        self._emit("AGENT_STOP", {"reason": self.stop_reason.value, "iterations": self.state.iteration})
         self._renderer.on_stop(self.stop_reason, self.state.iteration)
 
     def _on_memory_update(self) -> None:
+        self._emit("MEMORY_WRITE", {})
         self.continue_loop()
+
+    def _emit(self, event_type: str, payload: dict | None = None) -> None:
+        if self._event_bus is None:
+            return
+        self._event_bus.publish(AgentEvent(
+            type=event_type,
+            iteration=self.state.iteration,
+            state=self._fsm_state,
+            payload=payload or {},
+        ))
 
     def _build_result(self) -> dict:
         return {
