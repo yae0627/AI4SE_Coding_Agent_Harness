@@ -71,3 +71,68 @@ def test_terminal_renderer_truncates_long_output(capsys):
     captured = capsys.readouterr()
     last_line = captured.out.splitlines()[-1] if captured.out.splitlines() else ""
     assert len(last_line) <= 60
+
+
+from ai4se_agent.core.events import AgentEvent
+
+
+def test_renderer_handles_tool_start_event(capsys):
+    r = TerminalRenderer()
+    event = AgentEvent(
+        type="TOOL_START", iteration=1, state="TOOL_EXEC",
+        payload={"tool": "shell", "parameters": {"command": "echo hello"}},
+    )
+    r._on_tool_start(event)
+    # _on_tool_start is currently a no-op (action shown by _on_action_created)
+
+
+def test_renderer_handles_tool_end_event_ok(capsys):
+    r = TerminalRenderer()
+    event = AgentEvent(
+        type="TOOL_END", iteration=1, state="TOOL_EXEC",
+        payload={"tool": "shell", "success": True, "output_preview": "hello"},
+    )
+    r._on_tool_end(event)
+    captured = capsys.readouterr()
+    assert "OK" in captured.out
+
+
+def test_renderer_handles_tool_end_event_failed(capsys):
+    r = TerminalRenderer()
+    event = AgentEvent(
+        type="TOOL_END", iteration=1, state="TOOL_EXEC",
+        payload={"tool": "shell", "success": False, "output_preview": "error msg"},
+    )
+    r._on_tool_end(event)
+    captured = capsys.readouterr()
+    assert "FAILED" in captured.out
+
+
+def test_renderer_handles_llm_end_event(capsys):
+    r = TerminalRenderer(verbose=True)
+    event = AgentEvent(
+        type="LLM_END", iteration=1, state="LLM_CALL",
+        payload={"model": "gpt-4", "response_preview": '{"action": "finish"}'},
+    )
+    r._on_llm_end(event)
+    captured = capsys.readouterr()
+    assert "gpt-4" in captured.out
+
+
+def test_renderer_subscribe_registers_handlers():
+    from ai4se_agent.core.event_bus import EventBus
+    import sys, io
+    bus = EventBus()
+    r = TerminalRenderer(event_bus=bus)
+    captured = io.StringIO()
+    old_stdout = sys.stdout
+    sys.stdout = captured
+    try:
+        bus.publish(AgentEvent(
+            type="AGENT_STOP", iteration=3, state="STOP",
+            payload={"reason": "success", "iterations": 3}
+        ))
+        output = captured.getvalue()
+        assert "success" in output
+    finally:
+        sys.stdout = old_stdout
