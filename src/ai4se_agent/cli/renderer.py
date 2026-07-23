@@ -75,7 +75,7 @@ class TerminalRenderer(Renderer):
     def on_action(
         self, iteration: int, action: Action, guardrail_result: GuardrailResult | None
     ) -> None:
-        self._print(f"  action: {action.name}({action.params})")
+        self._print(f"  action: {action.name}({action.parameters})")
         if guardrail_result is not None:
             self._print(
                 f"  guardrail: {guardrail_result.policy} -> {guardrail_result.verdict}"

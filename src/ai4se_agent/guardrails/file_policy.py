@@ -9,7 +9,7 @@ class FilePolicy(Policy):
     def check(self, action: Action) -> GuardrailResult | None:
         if action.name not in ("write_file", "edit_file", "read_file"):
             return None
-        path = action.params.get("path", "")
+        path = action.parameters.get("path", "")
         for pattern in PROTECTED_PATTERNS:
             if pattern in path:
                 return GuardrailResult(

@@ -13,7 +13,7 @@ class CommandPolicy(Policy):
     def check(self, action: Action) -> GuardrailResult | None:
         if action.name != "shell":
             return None
-        command = action.params.get("command", "")
+        command = action.parameters.get("command", "")
         for pattern in DANGEROUS_PATTERNS:
             if re.search(pattern, command):
                 return GuardrailResult(

@@ -16,7 +16,14 @@ class StopReason(Enum):
 @dataclass
 class Action:
     name: str
-    params: dict
+    parameters: dict
+
+
+@dataclass
+class ParseResult:
+    success: bool
+    action: Optional["Action"] = None
+    error: Optional[str] = None
 
 
 @dataclass

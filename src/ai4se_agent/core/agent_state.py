@@ -17,7 +17,7 @@ class AgentState:
     retry_count: int = 0
 
     def record_turn(self, action: Action, observation: str) -> None:
-        self.history.append({"role": "assistant", "content": f"action: {action.name} {action.params}"})
+        self.history.append({"role": "assistant", "content": f"action: {action.name} {action.parameters}"})
         self.history.append({"role": "tool", "content": observation})
         self.last_action = action
         self.last_observation = observation

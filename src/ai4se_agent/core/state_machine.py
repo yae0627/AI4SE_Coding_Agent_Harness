@@ -142,7 +142,7 @@ class HarnessStateMachine:
             return
         self._pending_action = action
         self._tracer.record(
-            ActionEvent(self.state.iteration, action.name, action.params)
+            ActionEvent(self.state.iteration, action.name, action.parameters)
         )
         self.check_guardrails()
 

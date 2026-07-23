@@ -14,6 +14,9 @@ class ToolRegistry:
         if not tool:
             return ToolResult(success=False, output="", error=f"Unknown tool: {action.name}")
         try:
-            return tool.execute(action.params)
+            return tool.execute(action.parameters)
         except Exception as e:
             return ToolResult(success=False, output="", error=str(e))
+
+    def list_schemas(self) -> list[dict]:
+        return [tool.schema for tool in self._tools.values()]

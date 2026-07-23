@@ -6,6 +6,22 @@ from ai4se_agent.types import ToolResult
 class EditFileTool(Tool):
     name = "edit_file"
 
+    @property
+    def schema(self) -> dict:
+        return {
+            "name": "edit_file",
+            "description": "Edit a file by replacing text",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path"},
+                    "old_string": {"type": "string", "description": "Text to replace"},
+                    "new_string": {"type": "string", "description": "Replacement text"},
+                },
+                "required": ["path", "old_string", "new_string"],
+            },
+        }
+
     def execute(self, params: dict) -> ToolResult:
         path = Path(params["path"])
         old = params["old_string"]

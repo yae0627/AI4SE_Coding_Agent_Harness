@@ -12,7 +12,7 @@ def test_agent_state_initialization():
 
 def test_agent_state_record_turn():
     state = AgentState(goal="test")
-    action = Action(name="shell", params={"command": "pytest"})
+    action = Action(name="shell", parameters={"command": "pytest"})
     state.record_turn(action, "test output")
     assert len(state.history) == 2
     assert state.history[0]["role"] == "assistant"

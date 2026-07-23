@@ -6,6 +6,21 @@ from ai4se_agent.types import ToolResult
 class RunTestTool(Tool):
     name = "run_test"
 
+    @property
+    def schema(self) -> dict:
+        return {
+            "name": "run_test",
+            "description": "Run a pytest test suite",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "test_path": {"type": "string", "description": "Path to test file or directory"},
+                    "args": {"type": "string", "description": "Additional pytest arguments"},
+                },
+                "required": [],
+            },
+        }
+
     def execute(self, params: dict) -> ToolResult:
         test_path = params.get("test_path", "")
         args = params.get("args", "")

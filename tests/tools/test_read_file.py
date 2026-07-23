@@ -5,14 +5,14 @@ def test_read_existing_file(tmp_path):
     tool = ReadFileTool()
     test_file = tmp_path / "test.txt"
     test_file.write_text("line1\nline2")
-    action = Action(name="read_file", params={"path": str(test_file)})
-    result = tool.execute(action.params)
+    action = Action(name="read_file", parameters={"path": str(test_file)})
+    result = tool.execute(action.parameters)
     assert result.success is True
     assert "line1" in result.output
 
 def test_read_nonexistent_file():
     tool = ReadFileTool()
-    action = Action(name="read_file", params={"path": "/nonexistent/file.txt"})
-    result = tool.execute(action.params)
+    action = Action(name="read_file", parameters={"path": "/nonexistent/file.txt"})
+    result = tool.execute(action.parameters)
     assert result.success is False
     assert result.error is not None

@@ -23,7 +23,7 @@ def test_build_with_history():
     tools = [ShellTool()]
     builder = ContextBuilder(tools=tools)
     state = AgentState(goal="list files")
-    action = Action(name="shell", params={"command": "dir"})
+    action = Action(name="shell", parameters={"command": "dir"})
     state.record_turn(action, "file1.txt\nfile2.txt")
     messages = builder.build(state)
     assert len(messages) == 4

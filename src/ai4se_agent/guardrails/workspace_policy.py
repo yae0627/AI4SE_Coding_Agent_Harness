@@ -10,7 +10,7 @@ class WorkspacePolicy(Policy):
     def check(self, action: Action) -> GuardrailResult | None:
         if action.name not in ("read_file", "write_file", "edit_file"):
             return None
-        path = action.params.get("path", "")
+        path = action.parameters.get("path", "")
         real_path = os.path.realpath(path)
         if not real_path.startswith(self.workspace):
             return GuardrailResult(

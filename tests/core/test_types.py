@@ -2,9 +2,9 @@
 from ai4se_agent.types import Action, ToolResult, Feedback, GuardrailResult, CorrectionPlan, StopReason
 
 def test_action_creation():
-    action = Action(name="read_file", params={"path": "test.txt"})
+    action = Action(name="read_file", parameters={"path": "test.txt"})
     assert action.name == "read_file"
-    assert action.params == {"path": "test.txt"}
+    assert action.parameters == {"path": "test.txt"}
 
 def test_tool_result_defaults():
     result = ToolResult(success=True, output="file content", error=None)

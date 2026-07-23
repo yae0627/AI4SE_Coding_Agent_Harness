@@ -5,8 +5,8 @@ def test_edit_file(tmp_path):
     tool = EditFileTool()
     target = tmp_path / "test.txt"
     target.write_text("hello world\nfoo bar")
-    action = Action(name="edit_file", params={"path": str(target), "old_string": "foo bar", "new_string": "baz qux"})
-    result = tool.execute(action.params)
+    action = Action(name="edit_file", parameters={"path": str(target), "old_string": "foo bar", "new_string": "baz qux"})
+    result = tool.execute(action.parameters)
     assert result.success is True
     assert target.read_text() == "hello world\nbaz qux"
 
@@ -14,6 +14,6 @@ def test_edit_file_no_match(tmp_path):
     tool = EditFileTool()
     target = tmp_path / "test.txt"
     target.write_text("hello")
-    action = Action(name="edit_file", params={"path": str(target), "old_string": "nonexistent", "new_string": "replacement"})
-    result = tool.execute(action.params)
+    action = Action(name="edit_file", parameters={"path": str(target), "old_string": "nonexistent", "new_string": "replacement"})
+    result = tool.execute(action.parameters)
     assert result.success is False
