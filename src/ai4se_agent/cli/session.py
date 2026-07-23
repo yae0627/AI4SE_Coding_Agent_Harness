@@ -45,7 +45,7 @@ class SessionManager:
         provider = config.get_provider()
         if provider == "mock":
             llm: Any = MockAdapter(
-                responses=["action: shell command=echo hello", "[DONE]"]
+                responses=['{"action": "shell", "parameters": {"command": "echo hello"}}', '{"action": "finish", "parameters": {}}']
             )
         else:
             api_key = config.get("api_key") or ""
@@ -84,7 +84,7 @@ class SessionManager:
             agent_state=state,
             llm_adapter=llm,
             action_parser=ActionParser(),
-            action_validator=ActionValidator(),
+            action_validator=ActionValidator(schemas=tools.list_schemas()),
             tool_registry=tools,
             guardrail_engine=guardrails,
             feedback_loop=feedback,

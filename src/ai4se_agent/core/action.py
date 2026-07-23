@@ -1,9 +1,12 @@
 # src/ai4se_agent/core/action.py
+import json
 import re
-from ai4se_agent.types import Action
+from ai4se_agent.types import Action, ParseResult
 
 
-class ActionParser:
+class LegacyActionParser:
+    """Fallback parser for legacy text format: action: name key=value"""
+
     def parse(self, text: str) -> Action | None:
         match = re.match(r'action:\s*(\w+)(.*)', text.strip())
         if not match:
@@ -73,19 +76,103 @@ class ActionParser:
         return Action(name=name, parameters=params)
 
 
+class ActionParser:
+    def __init__(self, fallback: bool = True):
+        self._fallback = fallback
+        self._legacy = LegacyActionParser()
+
+    def _try_json(self, text: str) -> ParseResult:
+        text = text.strip()
+        code_block = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
+        if code_block:
+            text = code_block.group(1).strip()
+        brace_start = text.find('{')
+        brace_end = text.rfind('}')
+        if brace_start == -1 or brace_end == -1 or brace_end <= brace_start:
+            return ParseResult(success=False, error="No JSON object found")
+        text = text[brace_start:brace_end + 1]
+        try:
+            obj = json.loads(text)
+        except json.JSONDecodeError as e:
+            return ParseResult(success=False, error=f"Invalid JSON: {e}")
+        if "action" not in obj:
+            return ParseResult(success=False, error="Missing 'action' field in JSON")
+        return ParseResult(
+            success=True,
+            action=Action(name=obj["action"], parameters=obj.get("parameters", {}))
+        )
+
+    def parse(self, text: str) -> ParseResult:
+        result = self._try_json(text)
+        if result.success:
+            return result
+        if self._fallback:
+            action = self._legacy.parse(text)
+            if action:
+                return ParseResult(success=True, action=action)
+        return result
+
+
 class ActionValidator:
-    REQUIRED_PARAMS = {
-        "read_file": ["path"],
-        "write_file": ["path", "content"],
-        "edit_file": ["path", "old_string", "new_string"],
-        "shell": ["command"],
-        "run_test": [],
-    }
+    def __init__(self, schemas: list[dict] | None = None):
+        if schemas is None:
+            # Backward-compatible hardcoded defaults
+            schemas = [
+                {
+                    "name": "read_file",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}},
+                        "required": ["path"]
+                    }
+                },
+                {
+                    "name": "write_file",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+                        "required": ["path", "content"]
+                    }
+                },
+                {
+                    "name": "edit_file",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}, "old_string": {"type": "string"}, "new_string": {"type": "string"}},
+                        "required": ["path", "old_string", "new_string"]
+                    }
+                },
+                {
+                    "name": "shell",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"command": {"type": "string"}, "timeout": {"type": "integer"}},
+                        "required": ["command"]
+                    }
+                },
+                {
+                    "name": "run_test",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"test_path": {"type": "string"}, "args": {"type": "string"}},
+                        "required": []
+                    }
+                },
+            ]
+        self._schemas = {s["name"]: s for s in schemas}
 
     def validate(self, action: Action) -> list[str]:
         errors = []
-        required = self.REQUIRED_PARAMS.get(action.name, [])
+        schema = self._schemas.get(action.name)
+        if not schema:
+            errors.append(f"Unknown action: {action.name}")
+            return errors
+        required = schema["parameters"].get("required", [])
         for param in required:
             if param not in action.parameters:
-                errors.append(f"Missing required param: {param}")
+                errors.append(f"Missing required parameter: {param}")
+        for key, value in action.parameters.items():
+            prop = schema["parameters"]["properties"].get(key)
+            if prop and prop.get("type") == "string" and not isinstance(value, str):
+                errors.append(f"Parameter '{key}' should be string, got {type(value).__name__}")
         return errors

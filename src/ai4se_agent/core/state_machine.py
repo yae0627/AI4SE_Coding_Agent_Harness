@@ -58,7 +58,7 @@ class HarnessStateMachine:
         self._pending_action: Optional[Action] = None
         self._pending_guardrail: Optional[GuardrailResult] = None
         self._last_tool_result: Optional[ToolResult] = None
-        self._context_builder = ContextBuilder(tools=list(self.tools._tools.values()))
+        self._context_builder = ContextBuilder(tool_registry=self.tools)
         self._renderer = renderer
         self._tracer = tracer
 
@@ -125,16 +125,15 @@ class HarnessStateMachine:
 
     def _on_action_parse(self) -> None:
         last_msg = self.state.history[-1]["content"]
-        if "[DONE]" in last_msg:
-            self._renderer.on_state_change(
-                "ACTION_PARSE", "STOP", self.state.iteration
-            )
-            self.stop_reason = StopReason.SUCCESS
-            self.stop()
-            return
-        action = self.parser.parse(last_msg)
-        if action is None:
+        result = self.parser.parse(last_msg)
+        if not result.success:
             self.retry_parse()
+            return
+        action = result.action
+        if action.name == "finish":
+            self.stop_reason = StopReason.SUCCESS
+            self._renderer.on_state_change("ACTION_PARSE", "STOP", self.state.iteration)
+            self.stop()
             return
         errors = self.validator.validate(action)
         if errors:
