@@ -6,7 +6,7 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 
 ## 项目状态
 
-✅ **Phase 3 完成** — 182 个测试通过。Claude Code 风格终端 UI：彩色紧凑工具行、HITL 面板、蓝色分隔线。
+✅ **Action Schema 分离完成** — 188 个测试通过。CONTROL_SCHEMAS 独立于 ToolRegistry，prompt 自动包含 respond/finish。
 
 ## 架构
 

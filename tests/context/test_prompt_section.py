@@ -77,6 +77,28 @@ def test_tool_section_lists_all_tools():
     ], goal="")
     result = section.build(ctx)
     assert "read_file" in result
+    assert "### Tools" in result
+
+
+def test_tool_section_splits_controls():
+    section = ToolSection()
+    ctx = PromptContext(tools=[
+        {"name": "shell", "_category": "tool", "description": "Run command",
+         "parameters": {"type": "object", "properties": {}, "required": []}},
+        {"name": "respond", "_category": "control", "description": "Send message",
+         "parameters": {"type": "object", "properties": {"message": {"type": "string"}}, "required": ["message"]}},
+    ], goal="")
+    result = section.build(ctx)
+    assert "### Tools" in result
+    assert "shell" in result
+    assert "### Conversation" in result
+    assert "respond" in result
+
+
+def test_tool_section_empty_when_no_tools():
+    section = ToolSection()
+    result = section.build(PromptContext(tools=[], goal=""))
+    assert result == ""
 
 
 def test_format_section_includes_json_escaping():
@@ -84,12 +106,14 @@ def test_format_section_includes_json_escaping():
     result = section.build(PromptContext(tools=[], goal=""))
     assert '{"action"' in result
     assert '\\"' in result
+    assert "respond" in result
 
 
 def test_example_section_has_finish():
     section = ExampleSection()
     result = section.build(PromptContext(tools=[], goal=""))
     assert "finish" in result
+    assert "respond" in result
 
 
 def test_workspace_section_shows_os():
@@ -135,11 +159,13 @@ def test_prompt_composer_joins_sections():
     ])
     ctx = PromptContext(tools=[
         {"name": "shell", "description": "Run command",
-         "parameters": {"type": "object", "properties": {}, "required": []}}
+         "parameters": {"type": "object", "properties": {}, "required": []},
+         "_category": "tool"}
     ], goal="")
     result = composer.compose(ctx)
     assert len(result) > 0
     assert "shell" in result
+    assert "### Tools" in result
     assert "coding agent" in result.lower()
 
 

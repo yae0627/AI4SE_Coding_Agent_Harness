@@ -7,6 +7,7 @@ from ai4se_agent.context.sections import (
     ExampleSection, WorkspaceSection, RulesSection,
 )
 from ai4se_agent.context.workspace import WorkspaceCollector
+from ai4se_agent.core.action_schema import CONTROL_SCHEMAS
 from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.tools.registry import ToolRegistry
 
@@ -21,7 +22,11 @@ class ContextBuilder:
         workspace_root: str = ".",
         persistent_memory: "PersistentMemory | None" = None,
     ):
-        self._schemas = tool_registry.list_schemas()
+        tool_schemas = tool_registry.list_schemas()
+        for s in tool_schemas:
+            if "_category" not in s:
+                s["_category"] = "tool"
+        self._schemas = tool_schemas + CONTROL_SCHEMAS
         self._collector = WorkspaceCollector(workspace_root)
         self._persistent = persistent_memory
         self._composer = PromptComposer([
