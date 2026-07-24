@@ -6,7 +6,7 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 
 ## 项目状态
 
-✅ **Phase 2.1 完成** — 169 个测试通过，respond action 可用，ConversationMemory 统一跨轮次记忆。
+✅ **Phase 2.3 完成** — 177 个测试通过，Human Interrupt (/stop) + HITL 事件驱动确认 (/approve, /reject)。
 
 ## 架构
 

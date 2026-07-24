@@ -15,6 +15,7 @@ from ai4se_agent.guardrails.file_policy import FilePolicy
 from ai4se_agent.guardrails.git_policy import GitPolicy
 from ai4se_agent.guardrails.workspace_policy import WorkspacePolicy
 from ai4se_agent.llm.manager import LLMManager
+from ai4se_agent.core.interrupt import InterruptChannel
 from ai4se_agent.session.history import ConversationMemory
 from ai4se_agent.tools.edit_file import EditFileTool
 from ai4se_agent.tools.read_file import ReadFileTool
@@ -39,7 +40,7 @@ class AgentRuntime:
         self._llm = LLMManager(config)
         self._state: AgentState | None = None
 
-    def run(self) -> dict:
+    def run(self, interrupt: InterruptChannel | None = None) -> dict:
         self._emit("AGENT_START", payload={"goal": self.goal})
 
         llm = self._llm.get_adapter()
@@ -77,6 +78,7 @@ class AgentRuntime:
             guardrail_engine=guardrails,
             feedback_loop=feedback,
             event_bus=self._event_bus or EventBus(),
+            interrupt=interrupt,
         )
         result = machine.run()
         new_messages = self._state.history[history_start:]
@@ -108,7 +110,7 @@ class Session:
         self._event_bus = event_bus or EventBus()
         self.memory = memory or ConversationMemory()
 
-    def send(self, message: str) -> dict:
+    def send(self, message: str, interrupt: InterruptChannel | None = None) -> dict:
         if self._event_bus:
             self._event_bus.publish(AgentEvent(
                 type="SESSION_START", iteration=0, state="IDLE",
@@ -120,7 +122,7 @@ class Session:
             config=self._config,
             event_bus=self._event_bus,
         )
-        result = runtime.run()
+        result = runtime.run(interrupt=interrupt)
         if self._event_bus:
             self._event_bus.publish(AgentEvent(
                 type="SESSION_END", iteration=0, state="STOP",

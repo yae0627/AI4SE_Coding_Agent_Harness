@@ -478,3 +478,42 @@ continue_after_respond: RESPOND → CONTEXT_ORG
 - **169 测试全部通过**（+2 新增 respond 测试）
 - **Mock E2E**：respond → read_file → finish 正常流转
 - **Renderer 订阅**：`TerminalRenderer._on_respond_event()` 显示 `  [respond] <message>`
+
+## 阶段十三：Human Interrupt + HITL 确认替换 — Phase 2.2+2.3（2026-07-24）
+
+### 问题
+
+- Phase 2.2：`interactive()` 循环中用户必须等 agent 完成才能输入，`/stop` 无法中断运行中的 agent
+- Phase 2.3：`WAIT_APPROVAL` 用 `input()` 阻塞 stdin，不符合事件驱动架构
+
+### 决策
+
+| 决策点 | 选项 | 最终选择 | 理由 |
+|--------|------|---------|------|
+| 中断机制 | 信号驱动 / 后台线程 | **后台线程 + threading.Event** | 跨平台（Windows 无 SIGINT），与现有 input() 兼容 |
+| 通信通道 | 回调 / queue / 全局变量 | **InterruptChannel dataclass** | Event + Queue 组合，语义清晰 |
+| HITL 替换 | 保持 input() / 事件驱动 | **queue.Queue + 事件驱动** | 统一 stdin 线程，Renderer 订阅 APPROVAL_REQUIRED |
+| CLI 线程模型 | 单线程轮询 / 双线程 | **双线程（main stdin + agent daemon）** | 最简单，无需 select/poll 跨平台 Windows 适配 |
+
+### 新增模块
+
+```
+core/
+└── interrupt.py       InterruptChannel dataclass（threading.Event + queue.Queue）
+```
+
+### 实现
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `core/interrupt.py` | 新建 | `InterruptChannel`: `stop_requested` Event + `approval_response` Queue |
+| `core/state_machine.py` | 修改 | `_on_context_org()` 检测 stop；`_on_wait_approval()` 用 queue 替代 input() |
+| `cli/session.py` | 重写 | 双线程 CLI：agent 在 daemon 线程，主线程持续 stdin |
+| `cli/renderer.py` | 修改 | 订阅 APPROVAL_REQUIRED，显示 HITL prompt |
+| `session/session.py` | 修改 | `send()` 接受 interrupt 参数，传递到 state machine |
+
+### 验证结果
+
+- **177 测试全部通过**（+8 新增：6 InterruptChannel + 2 state machine stop/HITL）
+- **stop 测试**：后台线程 50ms 后设置 Event，state machine 检测到并返回 `user_cancel`
+- **HITL 测试**：GitPolicy 拦截 `git push` → APPROVAL_REQUIRED event → queue 收到 "approve" → 继续执行

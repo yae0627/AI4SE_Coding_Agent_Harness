@@ -19,6 +19,7 @@ from ai4se_agent.observability.events import (
 from ai4se_agent.observability.tracer import NullTracer, Tracer
 from ai4se_agent.tools.registry import ToolRegistry
 from ai4se_agent.core.events import AgentEvent
+from ai4se_agent.core.interrupt import InterruptChannel
 from ai4se_agent.types import Action, GuardrailResult, StopReason, ToolResult
 
 if TYPE_CHECKING:
@@ -49,6 +50,7 @@ class HarnessStateMachine:
         tracer: Tracer = NullTracer(),
         persistent_memory: PersistentMemory | None = None,
         interactive: bool = True,
+        interrupt: InterruptChannel | None = None,
     ):
         self.state = agent_state
         self.llm = llm_adapter
@@ -70,6 +72,7 @@ class HarnessStateMachine:
         self._tracer = tracer
         self._event_bus = event_bus
         self._interactive = interactive
+        self._interrupt = interrupt or InterruptChannel()
 
         self.machine = Machine(
             model=self,
@@ -106,6 +109,10 @@ class HarnessStateMachine:
         return self._build_result()
 
     def _on_context_org(self) -> None:
+        if self._interrupt.stop_requested.is_set():
+            self.stop_reason = StopReason.USER_CANCEL
+            self.stop()
+            return
         self.state.increment_iteration()
         if self.state.iteration > self.max_iterations:
             self.stop_reason = StopReason.MAX_ITERATION
@@ -193,11 +200,14 @@ class HarnessStateMachine:
     def _on_wait_approval(self) -> None:
         assert self._pending_action is not None
         assert self._pending_guardrail is not None
-        print(f"\n[DANGEROUS ACTION] Policy: {self._pending_guardrail.policy}")
-        print(f"Reason: {self._pending_guardrail.reason}")
-        print(f"Action: {self._pending_action}")
-        answer = input("Approve? (y/n): ").strip().lower()
-        if answer == "y":
+        self._emit("APPROVAL_REQUIRED", {
+            "policy": self._pending_guardrail.policy,
+            "reason": self._pending_guardrail.reason,
+            "action_name": self._pending_action.name,
+            "action_params": dict(self._pending_action.parameters),
+        })
+        response = self._interrupt.approval_response.get()
+        if response == "approve":
             self.approve()
         else:
             self.reject()

@@ -186,6 +186,15 @@ class TerminalRenderer(Renderer):
         message = event.payload.get("message", "")
         self._print(f"  [respond] {message}")
 
+    def _on_approval_required(self, event: AgentEvent) -> None:
+        policy = event.payload.get("policy", "unknown")
+        reason = event.payload.get("reason", "")
+        action_name = event.payload.get("action_name", "")
+        self._print(f"  [HITL] Policy: {policy}")
+        self._print(f"  Reason: {reason}")
+        self._print(f"  Action: {action_name}")
+        self._print(f"  Type /approve or /reject")
+
     def _on_agent_stop(self, event: AgentEvent) -> None:
         reason = event.payload.get("reason", "unknown")
         iterations = event.payload.get("iterations", 0)
