@@ -70,7 +70,67 @@ python scripts/log_agent.py "#task-03" "llm-adapter" "Add LLMAdapter abstraction
 - 所有测试通过才能合并 PR
 - CI 配置见 `.github/workflows/ci.yml` 和 `.gitlab-ci.yml`
 
-## 7. 包结构规约
+### 6.1 Push 策略
+
+- **默认不跑 CI**：日常开发 push 使用 `git push --no-verify`，跳过 pre-commit hooks 和 CI pipeline
+- 仅在 PR 合并前或最终验收时手动触发 CI 运行
+
+## 7. 阶段完成工作流（强制）
+
+每完成一个 Phase 或一组关联 task 后，按以下顺序执行：
+
+### 7.1 验证
+
+```
+pytest tests/ -v
+```
+
+确认全部测试通过，记录测试数量。
+
+### 7.2 日志记录
+
+```bash
+python scripts/log_agent.py "<phase-tag>" "<skill>" "<summary>" "<intervention>"
+```
+
+### 7.3 文档同步
+
+以下三个文件必须在 commit 前更新：
+
+| 文件 | 更新内容 |
+|------|---------|
+| `AGENT_LOG.md` | 自动追加（§7.2），commit hash 在 commit 后修正 |
+| `README.md` | 更新项目状态行（测试数量、Phase 进度） |
+| `SPEC_PROCESS.md` | 新增阶段记录：问题 → 决策表 → 实现表格 → 验证结果 |
+
+### 7.4 Commit
+
+```bash
+git add <changed-files> README.md SPEC_PROCESS.md AGENT_LOG.md
+git commit -m "feat: <phase description>
+
+<bullet points>
+
+<N> tests pass.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
+```
+
+### 7.5 Push
+
+```bash
+git push origin main --no-verify
+```
+
+### 7.6 Commit Hash 修正
+
+Push 后获取最新 hash，修正 AGENT_LOG.md 中该阶段条目的 commit 列，再次 commit：
+
+```bash
+git add AGENT_LOG.md && git commit -m "chore: fix AGENT_LOG commit hashes" && git push origin main --no-verify
+```
+
+## 8. 包结构规约
 
 ```
 src/ai4se_agent/
@@ -115,13 +175,13 @@ src/ai4se_agent/
     └── persistent.py     # 持久化记忆
 ```
 
-## 8. 凭据安全
+## 9. 凭据安全
 
 - 所有 API Key 通过 `.env` 文件存储，`getpass` 隐藏输入引导
 - `.env` 已加入 `.gitignore`，绝不提交 Git
 - 绝不写入日志或终端历史
 
-## 9. 测试约定
+## 10. 测试约定
 
 - 测试文件命名：`test_<模块名>.py`
 - 测试目录结构：`tests/` 镜像 `src/` 结构
