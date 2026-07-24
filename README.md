@@ -6,7 +6,7 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 
 ## 项目状态
 
-✅ **已完成** — 162 个测试通过，ruff 零告警，真实 API 端到端验证通过。
+✅ **Phase 2.1 完成** — 169 个测试通过，respond action 可用，ConversationMemory 统一跨轮次记忆。
 
 ## 架构
 
@@ -37,8 +37,8 @@ src/ai4se_agent/
 │   ├── event_bus.py      # EventBus（subscribe/publish）
 │   └── state_machine.py  # 11 状态 FSM 主循环（含 EventBus emit）
 ├── session/
-│   ├── history.py        # MessageHistory（跨轮次对话记忆）
-│   └── session.py        # Session + AgentRuntime（每轮临时 Runtime，永久 history）
+│   ├── history.py        # ConversationMemory（统一跨轮次对话记忆）
+│   └── session.py        # Session + AgentRuntime（Session 持有 ConversationMemory）
 ├── llm/
 │   ├── base.py           # LLMAdapter ABC
 │   ├── openai_adapter.py # OpenAI 适配器
@@ -66,9 +66,8 @@ src/ai4se_agent/
 │   ├── failure_db.py     # FailureDB (SQLite)
 │   └── loop.py           # FeedbackLoop 编排器
 ├── memory/
-│   ├── manager.py        # 记忆管理器（含 get_rules()）
-│   ├── session.py        # 运行时记忆（deque）
-│   └── persistent.py     # 持久化记忆（文件存储）
+│   ├── manager.py        # MemoryManager 聚合层（ConversationMemory + PersistentMemory + FailureLog）
+│   └── persistent.py     # PersistentMemory（项目规则文件存储）
 └── observability/
     ├── events.py          # 事件类型 + timestamp/elapsed_ms
     └── tracer.py          # Tracer：record_token, replay_filtered
@@ -76,7 +75,7 @@ src/ai4se_agent/
 
 ## 状态机
 
-11 状态 FSM（`transitions` 库），事件驱动输出：
+12 状态 FSM（`transitions` 库），事件驱动输出（含 RESPOND 交互状态）：
 
 ```
                  IDLE
@@ -214,7 +213,7 @@ Sensor (TestSensor / LintSensor)
 | **Context Engineering** | PromptComposer + 6 Section 组件，WorkspaceContext 动态注入（OS/文件/git/时间） |
 | **Action Protocol** | JSON-first 解析器 + legacy 回退 + JSON repair（修复 LLM 转义错误） |
 | **Event Bus** | 14 事件类型，FSM → EventBus → Renderer 解耦，subscribe/publish 模式 |
-| **Session Layer** | 跨轮次 MessageHistory，每轮临时 AgentRuntime 隔离 |
+| **Session Layer** | ConversationMemory 跨轮次持久，Session 持有唯一真实来源，AgentRuntime delta sync |
 | **配置系统** | TOML 三级加载（env vars → 项目 → 用户 → 默认），setup wizard + /v1/models 发现 |
 | **LLM Manager** | adapter 工厂 + runtime model switch，即时生效 |
 | **可观测性** | Trace timestamp/elapsed_ms，replay_filtered 结构化回放 |

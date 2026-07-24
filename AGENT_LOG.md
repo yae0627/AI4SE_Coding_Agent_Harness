@@ -76,3 +76,4 @@
 | 2026-07-23 21:40 | #task-20 | subagent-driven | Task 5: TerminalRenderer 订阅 EventBus（5 测试） | 现有 on_* 方法保持不变，新增 _on_* handler 方法，输出格式不变 | ✓ |
 | 2026-07-23 21:50 | #task-20 | subagent-driven | Task 6: CLI Session 连线 — interactive() 用 Session.send() | submit() 单次模式不变，向后兼容 | ✓ |
 | 2026-07-23 22:00 | #task-20 | verify | 162 测试全部通过，ruff clean，mock E2E + interactive 验证通过 | - | de1fa88 |
+| 2026-07-24 15:43 | #phase-2.1 | test-driven-development | Add respond action: agent can now communicate with user via respond action that bypasses Guardrail/TOOL_EXEC. FSM adds RESPOND state with transitions from ACTION_PARSE and back to CONTEXT_ORG. Interactive mode waits for user input, non-interactive continues. TerminalRenderer subscribes to RESPOND event. 169/169 tests pass. | Adopt user-defined 3-layer memory model. RESPOND state initially waits for input in interactive mode - user confirms current behavior is sufficient for Phase 2.1 | 5ca7c27 |

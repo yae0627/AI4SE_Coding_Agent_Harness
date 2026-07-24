@@ -29,7 +29,7 @@ class HarnessStateMachine:
     states = [
         "IDLE", "CONTEXT_ORG", "LLM_CALL", "ACTION_PARSE",
         "GUARDRAIL", "WAIT_APPROVAL", "TOOL_EXEC", "TOOL_ERROR",
-        "FEEDBACK", "MEMORY_UPDATE", "STOP"
+        "FEEDBACK", "MEMORY_UPDATE", "RESPOND", "STOP"
     ]
 
     def __getattr__(self, name: str) -> Any:
@@ -48,6 +48,7 @@ class HarnessStateMachine:
         max_iterations: int = 20,
         tracer: Tracer = NullTracer(),
         persistent_memory: PersistentMemory | None = None,
+        interactive: bool = True,
     ):
         self.state = agent_state
         self.llm = llm_adapter
@@ -68,6 +69,7 @@ class HarnessStateMachine:
         )
         self._tracer = tracer
         self._event_bus = event_bus
+        self._interactive = interactive
 
         self.machine = Machine(
             model=self,
@@ -95,6 +97,8 @@ class HarnessStateMachine:
         self.machine.add_transition("feedback_done", "FEEDBACK", "MEMORY_UPDATE", after="_on_memory_update")
         self.machine.add_transition("feedback_correct", "FEEDBACK", "CONTEXT_ORG", after="_on_context_org")
         self.machine.add_transition("continue_loop", "MEMORY_UPDATE", "CONTEXT_ORG", after="_on_context_org")
+        self.machine.add_transition("respond_to_user", "ACTION_PARSE", "RESPOND", after="_on_respond")
+        self.machine.add_transition("continue_after_respond", "RESPOND", "CONTEXT_ORG", after="_on_context_org")
         self.machine.add_transition("stop", "*", "STOP", after="_on_stop")
 
     def run(self) -> dict:
@@ -146,6 +150,11 @@ class HarnessStateMachine:
         if action.name == "finish":
             self.stop_reason = StopReason.SUCCESS
             self.stop()
+            return
+        if action.name == "respond":
+            self._pending_action = action
+            self._emit("RESPOND", {"message": action.parameters.get("message", "")})
+            self.respond_to_user()
             return
         errors = self.validator.validate(action)
         if errors:
@@ -248,6 +257,18 @@ class HarnessStateMachine:
 
     def _on_stop(self) -> None:
         self._emit("AGENT_STOP", {"reason": self.stop_reason.value, "iterations": self.state.iteration})
+
+    def _on_respond(self) -> None:
+        if self._interactive:
+            try:
+                user_input = input("> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                self.stop_reason = StopReason.USER_CANCEL
+                self.stop()
+                return
+            if user_input:
+                self.state.record_feedback(user_input)
+        self.continue_after_respond()
 
     def _on_memory_update(self) -> None:
         self._emit("MEMORY_WRITE", {})

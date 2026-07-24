@@ -88,6 +88,7 @@ class TerminalRenderer(Renderer):
             event_bus.subscribe("GUARDRAIL_PASS", self._on_guardrail_pass)
             event_bus.subscribe("GUARDRAIL_DENY", self._on_guardrail_deny)
             event_bus.subscribe("FEEDBACK_COMPLETED", self._on_feedback_completed)
+            event_bus.subscribe("RESPOND", self._on_respond_event)
             event_bus.subscribe("AGENT_STOP", self._on_agent_stop)
 
     def _print(self, line: str) -> None:
@@ -180,6 +181,10 @@ class TerminalRenderer(Renderer):
             self._print(f"  feedback: correction planned -- {scope[:100]}")
         else:
             self._print("  feedback: success")
+
+    def _on_respond_event(self, event: AgentEvent) -> None:
+        message = event.payload.get("message", "")
+        self._print(f"  [respond] {message}")
 
     def _on_agent_stop(self, event: AgentEvent) -> None:
         reason = event.payload.get("reason", "unknown")

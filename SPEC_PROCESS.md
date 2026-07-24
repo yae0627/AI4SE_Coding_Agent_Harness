@@ -407,3 +407,74 @@ session/
 - **162 测试全部通过**，ruff clean
 - **Mock E2E**：单次任务 + 交互式多轮均正常
 - **Review 修复**：handler 异常隔离、from_dict 一致性、round-trip 测试等 8 个问题
+
+## 阶段十一：记忆系统重构（2026-07-24）
+
+### 问题分析
+
+三个独立的"记忆"构造互不打通：
+- `MessageHistory`：跨 turn 但只存有损摘要（"Task completed: failed"）
+- `SessionMemory`：死代码，写入但从未被读取
+- `AgentState.history`：详细记录但随 `AgentRuntime` 析构丢弃
+
+导致 agent 跨 turn 丢失上下文：中文 prompt 下快速 finish，简单问候触发 `shell echo` 当"嘴"用。
+
+### 决策记录
+
+| 决策点 | 选项 | 最终选择 | 理由 |
+|--------|------|---------|------|
+| 记忆深度 | 三层全实现 / 前两层 / 仅 Session | **Session + Project Memory** | Long-term learning 复杂度失控，作业要求"及格"即可 |
+| MessageHistory 处理 | 修复 / 替换 | **重写为 ConversationMemory** | 底层数据结构需支持 metadata + extend，修不如换 |
+| 历史同步策略 | 摘要 / delta 增量 / 全量覆盖 | **delta 增量 sync** | 只同步本轮新增消息，避免跨 turn 重复 |
+| MemoryManager | 删除 / 保留但接入 | **重构为聚合层** | 统一 ConversationMemory + PersistentMemory + FailureLog |
+| 项目规则注入 | 不实现 / 简单加载 | **ContextBuilder 接收 PersistentMemory** | 通过现有 RulesSection 渲染，5 行改动 |
+
+### 实现
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `session/history.py` | 重写 | `ConversationMemory` 替代 `MessageHistory`，deque sliding window |
+| `session/session.py` | 重构 | Session 持有 ConversationMemory，AgentRuntime delta sync |
+| `memory/session.py` | 删除 | 死代码，从未被读取 |
+| `memory/manager.py` | 重写 | 聚合 ConversationMemory + PersistentMemory + FailureLog |
+| `context/builder.py` | 增强 | 接收 PersistentMemory，加载项目规则到 system prompt |
+| `core/state_machine.py` | 重构 | 移除未使用的 memory_manager 依赖 |
+
+### 验证结果
+
+- **167 测试全部通过**（+5 新增）
+- **Cross-turn demo**：3 轮对话，15 条消息，无重复，无 "Task completed" 摘要
+- **Project rules demo**：规则保存到 `memory/project_rules/` → `ContextBuilder.build()` 自动注入
+
+## 阶段十二：respond action — Phase 2.1（2026-07-24）
+
+### 问题
+
+Agent 唯一能和用户"交流"的方式是 `shell echo "..."`。简单问候变成 4 轮工具调用，浪费 token、偏离意图。
+
+### 决策
+
+| 决策点 | 选项 | 最终选择 | 理由 |
+|--------|------|---------|------|
+| respond 交互模式 | 仅展示 / 展示+等待输入 | **展示 + 交互模式下等待输入** | 参考 HITL 现有 `input()` 模式 |
+| FSM 状态 | 复用现有 / 新增 RESPOND | **新增 RESPOND 状态** | 语义独立，后续扩展 Human Interrupt 清晰 |
+| Guardrail 绕过 | 走 Tool Exec / 直接 bypass | **直接 bypass** | respond 不操作文件/系统，无需护栏 |
+
+### 实现
+
+```python
+# respond action JSON 协议
+{"action": "respond", "parameters": {"message": "我来分析一下这个项目的结构..."}}
+
+# FSM 新增转移
+respond_to_user: ACTION_PARSE → RESPOND
+continue_after_respond: RESPOND → CONTEXT_ORG
+```
+
+`_on_action_parse()` 在 `finish` 之后、`validate` 之前检查 `respond`，emit RESPOND 事件，绕过 Guardrail/TOOL_EXEC。
+
+### 验证结果
+
+- **169 测试全部通过**（+2 新增 respond 测试）
+- **Mock E2E**：respond → read_file → finish 正常流转
+- **Renderer 订阅**：`TerminalRenderer._on_respond_event()` 显示 `  [respond] <message>`
