@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ai4se_agent.cli.commands import handle_command
-from ai4se_agent.cli.renderer import NullRenderer, Renderer
+from ai4se_agent.cli.renderer import NullRenderer, Renderer, separator, prompt_str
 from ai4se_agent.config.loader import ConfigLoader
 from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.core.events import AgentEvent
@@ -43,9 +43,7 @@ class SessionManager:
     def start(self) -> None:
         cfg = self._config.load()
         model = cfg.model.active or "unknown"
-        print(f"Workspace: {Path.cwd().resolve()}")
-        print(f"Model: {model}")
-        print(f"Provider: {cfg.provider.name}")
+        print(f"ai4se-agent  {cfg.provider.name}:{model}")
         print()
 
     def submit(self, task: str) -> dict:
@@ -68,15 +66,14 @@ class SessionManager:
                                payload={"session_id": session.id}))
 
         self.start()
-        print("Commands: /stop (interrupt agent), /approve, /reject, /status, /verbose")
-        print()
 
         agent_thread: threading.Thread | None = None
         last_result: dict | None = None
 
         while True:
             try:
-                prompt = "> " if not self._agent_running else ""
+                print(separator())
+                prompt = prompt_str() if not self._agent_running else ""
                 line = input(prompt).strip()
             except (EOFError, KeyboardInterrupt):
                 if self._agent_running and agent_thread and agent_thread.is_alive():
@@ -102,13 +99,12 @@ class SessionManager:
                 ch = session._interrupt
                 if line == "/stop":
                     ch.request_stop()
-                    print("  [interrupt] Stop requested")
                 elif line == "/approve":
                     ch.send_approval(True)
                 elif line == "/reject":
                     ch.send_approval(False)
                 else:
-                    print("  Agent is running. Available: /stop, /approve, /reject")
+                    print("  Agent is running. /stop /approve /reject")
                 continue
 
             # Check if agent finished
@@ -116,7 +112,7 @@ class SessionManager:
                 agent_thread.join()
                 self._agent_running = False
                 if last_result:
-                    print(f"Result: {last_result['status']} ({last_result['reason']})")
+                    pass  # result shown by on_stop event
                 last_result = None
                 agent_thread = None
 
@@ -148,7 +144,6 @@ class SessionManager:
                     continue
                 if inner == "/stop":
                     ch.request_stop()
-                    print("  [interrupt] Stop requested")
                 elif inner == "/approve":
                     ch.send_approval(True)
                 elif inner == "/reject":
@@ -157,13 +152,11 @@ class SessionManager:
                     ch.request_stop()
                     break
                 else:
-                    print("  Agent is running. Available: /stop, /approve, /reject")
+                    print("  Agent is running. /stop /approve /reject")
 
             if agent_thread.is_alive():
                 agent_thread.join(timeout=1)
             self._agent_running = False
-            if last_result:
-                print(f"Result: {last_result['status']} ({last_result['reason']})")
 
         bus.publish(AgentEvent(type="SESSION_END", iteration=0, state="STOP",
                                payload={"reason": "user_exit"}))

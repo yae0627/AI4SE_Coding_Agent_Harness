@@ -6,7 +6,7 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 
 ## 项目状态
 
-✅ **Phase 2.3 完成** — 177 个测试通过，Human Interrupt (/stop) + HITL 事件驱动确认 (/approve, /reject)。
+✅ **Phase 3 完成** — 182 个测试通过。Claude Code 风格终端 UI：彩色紧凑工具行、HITL 面板、蓝色分隔线。
 
 ## 架构
 

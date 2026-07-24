@@ -123,9 +123,13 @@ class HarnessStateMachine:
     def _on_llm_call(self) -> None:
         try:
             messages = self._context_builder.build(self.state)
-            self._emit("LLM_START", {"model": getattr(self.llm, "model", "")})
-            response = self.llm.generate(messages)
             model = getattr(self.llm, "model", "")
+            self._emit("LLM_START", {"model": model})
+            buffer: list[str] = []
+            for token in self.llm.generate_stream(messages):
+                buffer.append(token)
+                self._emit("LLM_TOKEN", {"token": token, "model": model})
+            response = "".join(buffer)
             self._emit("LLM_END", {"model": model, "response_preview": response[:200]})
             self._tracer.record(
                 LLMEvent(self.state.iteration, model, messages, response)

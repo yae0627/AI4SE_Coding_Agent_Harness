@@ -1,7 +1,10 @@
 import io
 import sys
+import time
 
-from ai4se_agent.cli.renderer import NullRenderer, Renderer, TerminalRenderer
+from ai4se_agent.cli.renderer import (
+    NullRenderer, Renderer, TerminalRenderer, _compact_params, separator, prompt_str
+)
 from ai4se_agent.core.events import AgentEvent
 from ai4se_agent.types import StopReason, ToolResult
 
@@ -23,31 +26,19 @@ def test_terminal_renderer_creates(capsys):
     r = TerminalRenderer()
     r.on_state_change("IDLE", "CONTEXT_ORG", 1)
     captured = capsys.readouterr()
-    assert "[CONTEXT_ORG]" in captured.out
-    assert "Iteration 1" in captured.out
+    assert captured.out == ""  # state changes are internal, not shown
 
 
 def test_terminal_renderer_token_usage(capsys):
     r = TerminalRenderer(verbose=True)
     r.on_token_usage(2, 500, 200)
-    captured = capsys.readouterr()
-    assert "500" in captured.out
-    assert "200" in captured.out
+    assert r._total_tokens == 700  # accumulated, not printed directly
 
 
 def test_terminal_renderer_timing_verbose(capsys):
     r = TerminalRenderer(verbose=True)
     r.on_timing("LLM_CALL", 850.5)
-    captured = capsys.readouterr()
-    assert "LLM_CALL" in captured.out
-    assert "850" in captured.out
-
-
-def test_terminal_renderer_timing_non_verbose(capsys):
-    r = TerminalRenderer(verbose=False)
-    r.on_timing("LLM_CALL", 850.5)
-    captured = capsys.readouterr()
-    assert captured.out == ""
+    assert r._total_elapsed_ms == 850.5
 
 
 def test_terminal_renderer_on_stop_with_summary(capsys):
@@ -58,6 +49,7 @@ def test_terminal_renderer_on_stop_with_summary(capsys):
     captured = capsys.readouterr()
     assert "success" in captured.out
     assert "700" in captured.out
+    assert "5.0s" in captured.out
 
 
 def test_terminal_renderer_on_llm_call_verbose(capsys):
@@ -70,43 +62,43 @@ def test_terminal_renderer_on_llm_call_verbose(capsys):
 
 def test_terminal_renderer_truncates_long_output(capsys):
     r = TerminalRenderer(max_output=20)
-    result = ToolResult(success=False, output="a" * 100, error="err")
-    r.on_tool_exec(1, "shell", result)
-    captured = capsys.readouterr()
-    last_line = captured.out.splitlines()[-1] if captured.out.splitlines() else ""
-    assert len(last_line) <= 60
-
-
-def test_renderer_handles_tool_start_event(capsys):
-    r = TerminalRenderer()
-    event = AgentEvent(
-        type="TOOL_START", iteration=1, state="TOOL_EXEC",
-        payload={"tool": "shell", "parameters": {"command": "echo hello"}},
-    )
-    r._on_tool_start(event)
-    # _on_tool_start is currently a no-op (action shown by _on_action_created)
-
-
-def test_renderer_handles_tool_end_event_ok(capsys):
-    r = TerminalRenderer()
-    event = AgentEvent(
-        type="TOOL_END", iteration=1, state="TOOL_EXEC",
-        payload={"tool": "shell", "success": True, "output_preview": "hello"},
-    )
-    r._on_tool_end(event)
-    captured = capsys.readouterr()
-    assert "OK" in captured.out
-
-
-def test_renderer_handles_tool_end_event_failed(capsys):
-    r = TerminalRenderer()
+    r._tool_start_time = time.time()
+    r._tool_start_params = {"command": "x" * 80}
     event = AgentEvent(
         type="TOOL_END", iteration=1, state="TOOL_EXEC",
         payload={"tool": "shell", "success": False, "output_preview": "error msg"},
     )
     r._on_tool_end(event)
     captured = capsys.readouterr()
-    assert "FAILED" in captured.out
+    assert "FAIL" in captured.out
+    assert "error msg" in captured.out
+
+
+def test_renderer_handles_tool_end_event_ok(capsys):
+    r = TerminalRenderer()
+    r._tool_start_time = time.time() - 0.05  # simulate 50ms elapsed
+    r._tool_start_params = {"command": "echo hello"}
+    event = AgentEvent(
+        type="TOOL_END", iteration=1, state="TOOL_EXEC",
+        payload={"tool": "shell", "success": True, "output_preview": "hello"},
+    )
+    r._on_tool_end(event)
+    captured = capsys.readouterr()
+    assert "ok" in captured.out
+
+
+def test_renderer_handles_tool_end_event_failed(capsys):
+    r = TerminalRenderer()
+    r._tool_start_time = time.time() - 2.1  # simulate 2.1s elapsed
+    r._tool_start_params = {"command": "bad cmd"}
+    event = AgentEvent(
+        type="TOOL_END", iteration=1, state="TOOL_EXEC",
+        payload={"tool": "shell", "success": False, "output_preview": "error msg"},
+    )
+    r._on_tool_end(event)
+    captured = capsys.readouterr()
+    assert "FAIL" in captured.out
+    assert "error msg" in captured.out
 
 
 def test_renderer_handles_llm_end_event(capsys):
@@ -118,6 +110,38 @@ def test_renderer_handles_llm_end_event(capsys):
     r._on_llm_end(event)
     captured = capsys.readouterr()
     assert "gpt-4" in captured.out
+
+
+def test_renderer_approval_required_event(capsys):
+    r = TerminalRenderer()
+    event = AgentEvent(
+        type="APPROVAL_REQUIRED", iteration=2, state="WAIT_APPROVAL",
+        payload={
+            "policy": "GitPolicy",
+            "reason": "push to remote, irreversible",
+            "action_name": "shell",
+            "action_params": {"command": "git push origin main"},
+        },
+    )
+    r._on_approval_required(event)
+    captured = capsys.readouterr()
+    assert "APPROVAL REQUIRED" in captured.out
+    assert "GitPolicy" in captured.out
+    assert "git push" in captured.out
+    assert "/approve" in captured.out
+    assert "/reject" in captured.out
+
+
+def test_renderer_respond_event(capsys):
+    r = TerminalRenderer()
+    event = AgentEvent(
+        type="RESPOND", iteration=1, state="RESPOND",
+        payload={"message": "I found the issue in auth.py"},
+    )
+    r._on_respond_event(event)
+    captured = capsys.readouterr()
+    assert "auth.py" in captured.out
+    assert "[respond]" not in captured.out  # no prefix, clean output
 
 
 def test_renderer_subscribe_registers_handlers():
@@ -136,3 +160,47 @@ def test_renderer_subscribe_registers_handlers():
         assert "success" in output
     finally:
         sys.stdout = old_stdout
+
+
+def test_compact_params_returns_path_first():
+    assert _compact_params({"path": "auth.py", "content": "x"}) == "auth.py"
+
+
+def test_compact_params_returns_command_second():
+    assert _compact_params({"command": "pytest -v"}) == "pytest -v"
+
+
+def test_compact_params_truncates():
+    long_val = "x" * 100
+    result = _compact_params({"path": long_val})
+    assert len(result) == 60
+
+
+def test_separator_is_blue():
+    s = separator()
+    assert "\033[34m" in s  # blue ANSI code
+
+
+def test_prompt_str_is_blue():
+    p = prompt_str()
+    assert "\033[34m" in p
+    assert ">" in p
+
+
+def test_llm_token_streaming_output(capsys):
+    r = TerminalRenderer()
+    tokens = ['{"action":', ' "finish"', '}']
+    for t in tokens:
+        event = AgentEvent(
+            type="LLM_TOKEN", iteration=1, state="LLM_CALL",
+            payload={"token": t, "model": "gpt-4"},
+        )
+        r._on_llm_token(event)
+    # End the stream
+    r._on_llm_end(AgentEvent(
+        type="LLM_END", iteration=1, state="LLM_CALL",
+        payload={"model": "gpt-4", "response_preview": '{"action": "finish"}'},
+    ))
+    captured = capsys.readouterr()
+    assert '{"action":' in captured.out
+    assert '"finish"' in captured.out

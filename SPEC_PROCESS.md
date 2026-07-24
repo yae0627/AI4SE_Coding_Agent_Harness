@@ -517,3 +517,72 @@ core/
 - **177 测试全部通过**（+8 新增：6 InterruptChannel + 2 state machine stop/HITL）
 - **stop 测试**：后台线程 50ms 后设置 Event，state machine 检测到并返回 `user_cancel`
 - **HITL 测试**：GitPolicy 拦截 `git push` → APPROVAL_REQUIRED event → queue 收到 "approve" → 继续执行
+
+## 阶段十四：结构化终端 UI — Phase 3（2026-07-24）
+
+### 问题
+
+当前 `TerminalRenderer` 输出纯文本 `[STATE]` 标记，工具结果用 `result: OK/FAILED` 单独一行，视觉效果单调分散。用户希望 Claude Code 风格的交互体验。
+
+### 决策
+
+| 决策点 | 选项 | 最终选择 | 理由 |
+|--------|------|---------|------|
+| 屏幕模式 | alternate screen / 普通输出 | **普通输出** | 用户可滚动回看历史，alternate screen 无滚动条 |
+| HITL 面板 | 四边框 / 上下边框 | **仅上下边框** | 左右边框内容长度变化会导致对不齐 |
+| respond 颜色 | cyan / 默认色 | **默认色** | 主体内容最频繁，彩色反而干扰阅读 |
+| 分隔线字符 | `─` Unicode / `-` ASCII | **`─` + fallback** | Windows GBK 不支持 `─`，回退到 `-` |
+| 输入提示符 | `❯` Unicode / `>` ASCII | **`> ` 蓝色** | `❯` 在 Windows GBK 下编码失败 |
+| 依赖 | rich 库 / 纯 ANSI | **纯 ANSI** | 零外部依赖，colorama 也不引入 |
+
+### 视觉色板
+
+| 元素 | 颜色 | 效果 |
+|------|------|------|
+| respond 消息 | 默认 | 主体内容 |
+| 工具名/参数 | dim 灰色 | 次要信息，视觉后退 |
+| 成功/失败 | 绿色 `ok` / 红色 `FAIL` | 明确的操作信号 |
+| HITL 边框/操作 | 黄色 | 警告阻断 |
+| 用户输入/标题 | 白色粗体 | 强调 |
+| 分隔线/输入提示 | 蓝色 | 结构分界 |
+
+### 实现
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `cli/renderer.py` | 重写 | 事件处理器改为紧凑彩色输出，`_compact_params()` 格式化工具参数，`separator()`/`prompt_str()` 公共函数 |
+| `cli/session.py` | 修改 | 启动打印简化 banner，蓝色分隔线 + `prompt_str()` 输入区 |
+| `demo/ui_preview.py` | 新建 | 静态预览脚本，模拟完整交互流程 |
+
+### 验证结果
+
+- **182 测试全部通过**（+5 新增 renderer 测试）
+- 预览脚本 `python demo/ui_preview.py` 可手动体验完整交互效果
+
+## 阶段十五：流式 LLM 输出 — Phase 4（2026-07-24）
+
+### 问题
+
+`LLMAdapter.generate()` 返回完整字符串，用户等待 10 秒才看到结果，感知延迟高。需要流式逐 token 显示。
+
+### 决策
+
+| 决策点 | 选项 | 最终选择 | 理由 |
+|--------|------|---------|------|
+| 双通道分离 | text buffer + JSON buffer / 单通道 | **单通道（先不做分离）** | respond action 已提供"说话"渠道，双通道需改 action 协议 |
+| stream 接口 | 回调 / Iterator | **Iterator (yield)** | Python 原生，无需引入回调框架 |
+| 实时显示内容 | 仅状态提示 / 全量 token | **全量 token 实时显示** | 用户接受 JSON 原文在流式时可见，有调试价值 |
+
+### 实现
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `llm/base.py` | 修改 | 新增 `generate_stream()` 默认实现（yield 全量） |
+| `llm/mock_adapter.py` | 修改 | `generate_stream()` 逐字符 yield |
+| `core/state_machine.py` | 修改 | `_on_llm_call()` 使用 `generate_stream()`，emit `LLM_TOKEN` 事件 |
+| `cli/renderer.py` | 修改 | 订阅 `LLM_TOKEN`，`print(token, end="", flush=True)` 实时显示 |
+
+### 验证结果
+
+- **186 测试全部通过**（+4 新增 streaming 测试）
+- Mock 流式逐字符验证 + LLM_TOKEN 事件订阅验证

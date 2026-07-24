@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 from ai4se_agent.llm.base import LLMAdapter
 
 
@@ -10,3 +12,8 @@ class MockAdapter(LLMAdapter):
         response = self.responses[self._index % len(self.responses)]
         self._index += 1
         return response
+
+    def generate_stream(self, messages: list[dict]) -> Iterator[str]:
+        response = self.generate(messages)
+        for ch in response:
+            yield ch
