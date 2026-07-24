@@ -15,10 +15,7 @@ from ai4se_agent.guardrails.file_policy import FilePolicy
 from ai4se_agent.guardrails.git_policy import GitPolicy
 from ai4se_agent.guardrails.workspace_policy import WorkspacePolicy
 from ai4se_agent.llm.manager import LLMManager
-from ai4se_agent.memory.manager import MemoryManager
-from ai4se_agent.memory.persistent import PersistentMemory
-from ai4se_agent.memory.session import SessionMemory
-from ai4se_agent.session.history import MessageHistory
+from ai4se_agent.session.history import ConversationMemory
 from ai4se_agent.tools.edit_file import EditFileTool
 from ai4se_agent.tools.read_file import ReadFileTool
 from ai4se_agent.tools.registry import ToolRegistry
@@ -31,12 +28,12 @@ class AgentRuntime:
     def __init__(
         self,
         goal: str,
-        history: list[dict],
+        memory: ConversationMemory,
         config: ConfigLoader,
         event_bus: EventBus | None = None,
     ):
         self.goal = goal
-        self._history = history
+        self._memory = memory
         self._config = config
         self._event_bus = event_bus
         self._llm = LLMManager(config)
@@ -66,13 +63,10 @@ class AgentRuntime:
             planner=CorrectionPlanner(),
         )
 
-        memory = MemoryManager(
-            session=SessionMemory(),
-            persistent=PersistentMemory(),
-        )
-
         self._state = AgentState(goal=self.goal)
-        self._state.history = list(self._history)
+        self._state.history = self._memory.get_recent()
+        history_start = len(self._state.history)
+        self._state.history.append({"role": "user", "content": self.goal})
 
         machine = HarnessStateMachine(
             agent_state=self._state,
@@ -82,11 +76,11 @@ class AgentRuntime:
             tool_registry=tools,
             guardrail_engine=guardrails,
             feedback_loop=feedback,
-            memory_manager=memory,
             event_bus=self._event_bus or EventBus(),
         )
         result = machine.run()
-        # AGENT_STOP is emitted by StateMachine._on_stop via EventBus
+        new_messages = self._state.history[history_start:]
+        self._memory.extend(new_messages)
         return result
 
     def _emit(self, event_type: str, payload: dict | None = None) -> None:
@@ -107,12 +101,12 @@ class Session:
         self,
         config: ConfigLoader,
         event_bus: EventBus | None = None,
-        history: MessageHistory | None = None,
+        memory: ConversationMemory | None = None,
     ):
         self.id = uuid.uuid4().hex[:12]
         self._config = config
         self._event_bus = event_bus or EventBus()
-        self.history = history or MessageHistory()
+        self.memory = memory or ConversationMemory()
 
     def send(self, message: str) -> dict:
         if self._event_bus:
@@ -122,12 +116,11 @@ class Session:
             ))
         runtime = AgentRuntime(
             goal=message,
-            history=self.history.get_recent(),
+            memory=self.memory,
             config=self._config,
             event_bus=self._event_bus,
         )
         result = runtime.run()
-        self.history.add_turn(message, result)
         if self._event_bus:
             self._event_bus.publish(AgentEvent(
                 type="SESSION_END", iteration=0, state="STOP",

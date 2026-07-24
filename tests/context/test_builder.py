@@ -86,3 +86,33 @@ def test_build_with_feedback(tmp_path):
     messages = builder.build(state)
     assert len(messages) == 3
     assert messages[2]["role"] == "user"
+
+
+def test_build_includes_project_rules(tmp_path):
+    from ai4se_agent.memory.persistent import PersistentMemory
+    pers = PersistentMemory(base_dir=str(tmp_path))
+    pers.save_rule("testing", "always use pytest")
+    pers.save_rule("style", "use snake_case")
+
+    registry = ToolRegistry()
+    registry.register(ReadFileTool())
+    builder = ContextBuilder(
+        tool_registry=registry,
+        workspace_root=str(tmp_path),
+        persistent_memory=pers,
+    )
+    state = AgentState(goal="test")
+    messages = builder.build(state)
+    prompt = messages[0]["content"]
+    assert "always use pytest" in prompt
+    assert "use snake_case" in prompt
+
+
+def test_build_without_persistent_memory_no_rules_section(tmp_path):
+    registry = ToolRegistry()
+    registry.register(ReadFileTool())
+    builder = ContextBuilder(tool_registry=registry, workspace_root=str(tmp_path))
+    state = AgentState(goal="test")
+    messages = builder.build(state)
+    prompt = messages[0]["content"]
+    assert "Project Rules" not in prompt

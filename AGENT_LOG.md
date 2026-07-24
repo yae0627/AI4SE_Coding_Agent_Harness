@@ -4,6 +4,8 @@
 
 | 时间 | Task | 技能 | 摘要 | 人工干预 | Commit |
 |------|------|------|------|----------|--------|
+| 2026-07-24 15:20 | #task-mem-01 | writing-plans | 记忆系统重构：7-task 实现计划，ConversationMemory 替代 MessageHistory + SessionMemory，PersistentMemory 接入 ContextBuilder | 用户确定三层记忆模型（Session + Project + LongTerm），只实现前两层。Memory 做"及格"不做"深度" | - |
+| 2026-07-24 15:17 | #task-mem-01 | using-git-worktrees | 创建 worktree 隔离 → 发现项目文件未入 git，回退到原地工作 | - | - |
 | 2026-07-14 22:00 | #task-01 | brainstorming | 初始化项目骨架、目录结构、pyproject.toml、AGENTS.md | - | e9f9422 |
 | 2026-07-21 14:00 | #task-02 | brainstorming | 完成 11 状态 FSM 设计，确认 Feedback Loop 为重点维度 | 采纳 Agent 建议：增加 WAIT_APPROVAL / TOOL_ERROR 状态，Corrector → CorrectionPlanner，Classifier 规则驱动 | - |
 | 2026-07-21 15:00 | #task-02 | brainstorming | 完成护栏、工具、记忆、凭据设计，确认架构方案 | 采纳 Agent 建议：增加 WorkspacePolicy，Tool 统一接口，LLMAdapter 抽象 | - |

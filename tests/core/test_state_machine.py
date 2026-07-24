@@ -5,9 +5,6 @@ from ai4se_agent.llm.mock_adapter import MockAdapter
 from ai4se_agent.core.action import ActionParser, ActionValidator
 from ai4se_agent.tools.registry import ToolRegistry
 from ai4se_agent.guardrails.engine import GuardrailEngine
-from ai4se_agent.memory.manager import MemoryManager
-
-
 def test_state_machine_completes_successfully(tmp_path):
     llm = MockAdapter(responses=["action: read_file path=test.txt", "[DONE]"])
     registry = ToolRegistry()
@@ -21,7 +18,6 @@ def test_state_machine_completes_successfully(tmp_path):
         tool_registry=registry,
         guardrail_engine=guardrails,
         feedback_loop=None,
-        memory_manager=MemoryManager(),
         max_iterations=5,
         event_bus=EventBus(),
     )
@@ -42,7 +38,6 @@ def test_state_machine_with_tracer():
         tool_registry=registry,
         guardrail_engine=guardrails,
         feedback_loop=None,
-        memory_manager=MemoryManager(),
         max_iterations=5,
         event_bus=EventBus(),
     )

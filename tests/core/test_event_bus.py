@@ -5,7 +5,6 @@ from ai4se_agent.core.events import AgentEvent
 from ai4se_agent.core.state_machine import HarnessStateMachine
 from ai4se_agent.guardrails.engine import GuardrailEngine
 from ai4se_agent.llm.mock_adapter import MockAdapter
-from ai4se_agent.memory.manager import MemoryManager
 from ai4se_agent.tools.registry import ToolRegistry
 
 
@@ -104,7 +103,6 @@ def test_state_machine_emits_events():
         tool_registry=ToolRegistry(),
         guardrail_engine=GuardrailEngine(),
         feedback_loop=None,
-        memory_manager=MemoryManager(),
         max_iterations=3,
         event_bus=bus,
     )

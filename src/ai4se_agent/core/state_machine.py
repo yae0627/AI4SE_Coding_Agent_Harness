@@ -8,7 +8,7 @@ from ai4se_agent.core.action import ActionParser, ActionValidator
 from ai4se_agent.feedback.loop import FeedbackLoop
 from ai4se_agent.guardrails.engine import GuardrailEngine
 from ai4se_agent.llm.base import LLMAdapter
-from ai4se_agent.memory.manager import MemoryManager
+from ai4se_agent.memory.persistent import PersistentMemory
 from ai4se_agent.observability.events import (
     ActionEvent,
     FeedbackEvent,
@@ -44,10 +44,10 @@ class HarnessStateMachine:
         tool_registry: ToolRegistry,
         guardrail_engine: GuardrailEngine,
         feedback_loop: FeedbackLoop | None,
-        memory_manager: MemoryManager,
         event_bus: "EventBus",
         max_iterations: int = 20,
         tracer: Tracer = NullTracer(),
+        persistent_memory: PersistentMemory | None = None,
     ):
         self.state = agent_state
         self.llm = llm_adapter
@@ -56,14 +56,15 @@ class HarnessStateMachine:
         self.tools = tool_registry
         self.guardrails = guardrail_engine
         self.feedback = feedback_loop
-        self.memory = memory_manager
         self.max_iterations = max_iterations
         self.stop_reason = StopReason.SUCCESS
         self._pending_action: Optional[Action] = None
         self._pending_guardrail: Optional[GuardrailResult] = None
         self._last_tool_result: Optional[ToolResult] = None
         self._context_builder = ContextBuilder(
-            tool_registry=self.tools, workspace_root=str(Path.cwd().resolve())
+            tool_registry=self.tools,
+            workspace_root=str(Path.cwd().resolve()),
+            persistent_memory=persistent_memory,
         )
         self._tracer = tracer
         self._event_bus = event_bus
