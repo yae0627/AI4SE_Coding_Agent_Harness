@@ -1,6 +1,7 @@
 from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.types import Action
 
+
 def test_agent_state_initialization():
     state = AgentState(goal="fix the bug")
     assert state.goal == "fix the bug"

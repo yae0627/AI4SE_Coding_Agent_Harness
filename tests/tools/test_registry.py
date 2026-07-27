@@ -1,6 +1,7 @@
-from ai4se_agent.tools.registry import ToolRegistry
 from ai4se_agent.tools.read_file import ReadFileTool
+from ai4se_agent.tools.registry import ToolRegistry
 from ai4se_agent.types import Action
+
 
 def test_register_and_execute(tmp_path):
     registry = ToolRegistry()

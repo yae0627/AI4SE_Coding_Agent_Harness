@@ -1,10 +1,15 @@
 from typing import TYPE_CHECKING
 
-from ai4se_agent.context.prompt_context import PromptContext
 from ai4se_agent.context.prompt_composer import PromptComposer
+from ai4se_agent.context.prompt_context import PromptContext
 from ai4se_agent.context.sections import (
-    SystemRoleSection, ToolSection, FormatSection,
-    ExampleSection, WorkspaceSection, RulesSection, PlanSection,
+    ExampleSection,
+    FormatSection,
+    PlanSection,
+    RulesSection,
+    SystemRoleSection,
+    ToolSection,
+    WorkspaceSection,
 )
 from ai4se_agent.context.workspace import WorkspaceCollector
 from ai4se_agent.core.action_schema import CONTROL_SCHEMAS

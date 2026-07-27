@@ -30,6 +30,17 @@ ai4se-agent = "ai4se_agent.cli.main:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.ruff.lint]
+ignore = [
+    "BLE001",   # blind except: intentional in tools/guard for robustness
+    "S110",     # try-except-pass: intentional in event_bus (silent handler failure)
+    "B008",     # function call in default: intentional NullTracer sentinel
+    "B023",     # closure binds loop var: works correctly (single-iteration loop)
+    "DTZ005",   # datetime without tz: used for simple timestamps
+    "RUF012",   # mutable class attribute: intentional static class list
+    "PLW1510",  # subprocess without check: intentional manual returncode check
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

@@ -1,5 +1,6 @@
 from ai4se_agent.memory.persistent import PersistentMemory
 
+
 def test_save_and_load_rule(tmp_path):
     mem = PersistentMemory(base_dir=str(tmp_path))
     mem.save_rule("branch_naming", "Use feat/ prefix")

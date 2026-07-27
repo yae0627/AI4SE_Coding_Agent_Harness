@@ -15,5 +15,4 @@ class MockAdapter(LLMAdapter):
 
     def generate_stream(self, messages: list[dict]) -> Iterator[str]:
         response = self.generate(messages)
-        for ch in response:
-            yield ch
+        yield from response

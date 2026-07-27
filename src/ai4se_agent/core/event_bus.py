@@ -1,5 +1,6 @@
 from collections import defaultdict
-from typing import Callable
+from collections.abc import Callable
+
 from ai4se_agent.core.events import AgentEvent
 
 

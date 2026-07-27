@@ -200,8 +200,8 @@ class TerminalUI:
             import msvcrt
             return msvcrt.getwch()
         except ImportError:
-            import tty
             import termios
+            import tty
             fd = sys.stdin.fileno()
             old = termios.tcgetattr(fd)
             try:

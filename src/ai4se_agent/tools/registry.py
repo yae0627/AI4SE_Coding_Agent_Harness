@@ -1,6 +1,6 @@
+from ai4se_agent.core.sanitizer.path import PathNormalizer
 from ai4se_agent.tools.base import Tool
 from ai4se_agent.types import Action, ToolResult
-from ai4se_agent.core.sanitizer.path import PathNormalizer
 
 
 class ToolRegistry:

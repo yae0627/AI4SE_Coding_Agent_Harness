@@ -1,5 +1,5 @@
-from ai4se_agent.context.prompt_section import PromptSection
 from ai4se_agent.context.prompt_context import PromptContext
+from ai4se_agent.context.prompt_section import PromptSection
 
 
 class RulesSection(PromptSection):

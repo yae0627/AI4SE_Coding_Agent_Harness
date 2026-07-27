@@ -1,6 +1,7 @@
 from ai4se_agent.tools.write_file import WriteFileTool
 from ai4se_agent.types import Action
 
+
 def test_write_file(tmp_path):
     tool = WriteFileTool()
     target = tmp_path / "out.txt"

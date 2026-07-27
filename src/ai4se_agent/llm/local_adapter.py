@@ -1,5 +1,7 @@
 from typing import Any
+
 from openai import OpenAI
+
 from ai4se_agent.llm.base import LLMAdapter
 
 

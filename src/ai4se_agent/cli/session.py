@@ -56,8 +56,8 @@ class SessionManager:
         print()
 
     def submit(self, task: str) -> dict:
-        from ai4se_agent.session.session import Session
         from ai4se_agent.core.event_bus import EventBus
+        from ai4se_agent.session.session import Session
 
         bus = EventBus()
         self._wire_renderer(bus)
@@ -65,8 +65,8 @@ class SessionManager:
         return session.send(task)
 
     def interactive(self) -> None:
-        from ai4se_agent.session.session import Session
         from ai4se_agent.core.event_bus import EventBus
+        from ai4se_agent.session.session import Session
 
         bus = EventBus()
         self._wire_renderer(bus)

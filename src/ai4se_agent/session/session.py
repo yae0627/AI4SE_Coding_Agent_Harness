@@ -1,9 +1,11 @@
 import uuid
+
 from ai4se_agent.config.loader import ConfigLoader
 from ai4se_agent.core.action import ActionParser, ActionValidator
 from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.core.event_bus import EventBus
 from ai4se_agent.core.events import AgentEvent
+from ai4se_agent.core.interrupt import InterruptChannel
 from ai4se_agent.core.state_machine import HarnessStateMachine
 from ai4se_agent.feedback.classifier import FailureClassifier
 from ai4se_agent.feedback.loop import FeedbackLoop
@@ -15,7 +17,6 @@ from ai4se_agent.guardrails.file_policy import FilePolicy
 from ai4se_agent.guardrails.git_policy import GitPolicy
 from ai4se_agent.guardrails.workspace_policy import WorkspacePolicy
 from ai4se_agent.llm.manager import LLMManager
-from ai4se_agent.core.interrupt import InterruptChannel
 from ai4se_agent.session.history import ConversationMemory
 from ai4se_agent.tools.edit_file import EditFileTool
 from ai4se_agent.tools.read_file import ReadFileTool

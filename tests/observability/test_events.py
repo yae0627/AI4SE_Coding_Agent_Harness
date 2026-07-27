@@ -1,4 +1,4 @@
-from ai4se_agent.observability.events import EventType, StateEvent, LLMEvent
+from ai4se_agent.observability.events import EventType, LLMEvent, StateEvent
 
 
 def test_event_type_values():

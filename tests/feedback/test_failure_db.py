@@ -1,5 +1,6 @@
 from ai4se_agent.feedback.failure_db import FailureDB
 
+
 def test_failure_db_save_and_query(tmp_path):
     db = FailureDB(db_path=str(tmp_path / "test_failure.db"))
     db.record_failure("logic_error", "Missing null check on order_id", "Add guard clause before query")

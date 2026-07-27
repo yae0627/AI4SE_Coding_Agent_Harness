@@ -1,7 +1,7 @@
 import re
+
 from ai4se_agent.guardrails.base import Policy
 from ai4se_agent.types import Action, GuardrailResult
-
 
 HIGH_RISK_GIT = [r'git\s+push', r'git\s+reset\s+--hard', r'git\s+merge', r'git\s+rebase']
 

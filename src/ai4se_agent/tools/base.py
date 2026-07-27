@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 from ai4se_agent.types import ToolResult
 
 

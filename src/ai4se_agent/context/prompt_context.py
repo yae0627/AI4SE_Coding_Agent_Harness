@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ai4se_agent.context.workspace import WorkspaceSnapshot
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 class PromptContext:
     tools: list[dict]
     goal: str
-    workspace: "WorkspaceSnapshot | None" = None  # noqa: F821
+    workspace: WorkspaceSnapshot | None = None
     rules: list[str] = field(default_factory=list)
     feedback: list[dict] = field(default_factory=list)
-    plan: Optional["Plan"] = None  # noqa: F821
+    plan: Plan | None = None

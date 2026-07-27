@@ -1,10 +1,14 @@
 # src/ai4se_agent/core/state_machine.py
 from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
 from transitions import Machine
+
 from ai4se_agent.context.builder import ContextBuilder
-from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.core.action import ActionParser, ActionValidator
+from ai4se_agent.core.agent_state import AgentState
+from ai4se_agent.core.events import AgentEvent
+from ai4se_agent.core.interrupt import InterruptChannel
 from ai4se_agent.feedback.loop import FeedbackLoop
 from ai4se_agent.guardrails.engine import GuardrailEngine
 from ai4se_agent.llm.base import LLMAdapter
@@ -18,8 +22,6 @@ from ai4se_agent.observability.events import (
 )
 from ai4se_agent.observability.tracer import NullTracer, Tracer
 from ai4se_agent.tools.registry import ToolRegistry
-from ai4se_agent.core.events import AgentEvent
-from ai4se_agent.core.interrupt import InterruptChannel
 from ai4se_agent.types import Action, GuardrailResult, Plan, StopReason, ToolResult
 
 if TYPE_CHECKING:
@@ -63,9 +65,9 @@ class HarnessStateMachine:
         self.max_iterations = max_iterations
         self.max_step_iterations = max_step_iterations
         self.stop_reason = StopReason.SUCCESS
-        self._pending_action: Optional[Action] = None
-        self._pending_guardrail: Optional[GuardrailResult] = None
-        self._last_tool_result: Optional[ToolResult] = None
+        self._pending_action: Action | None = None
+        self._pending_guardrail: GuardrailResult | None = None
+        self._last_tool_result: ToolResult | None = None
         self._context_builder = ContextBuilder(
             tool_registry=self.tools,
             workspace_root=str(Path.cwd().resolve()),

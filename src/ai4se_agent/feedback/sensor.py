@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from ai4se_agent.types import ToolResult, Feedback
+
+from ai4se_agent.types import Feedback, ToolResult
 
 
 class Sensor(ABC):

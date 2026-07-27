@@ -1,8 +1,9 @@
-from ai4se_agent.feedback.loop import FeedbackLoop
-from ai4se_agent.feedback.sensor import TestSensor
 from ai4se_agent.feedback.classifier import FailureClassifier
+from ai4se_agent.feedback.loop import FeedbackLoop
 from ai4se_agent.feedback.planner import CorrectionPlanner
+from ai4se_agent.feedback.sensor import TestSensor
 from ai4se_agent.types import ToolResult
+
 
 def test_feedback_loop_produces_correction():
     loop = FeedbackLoop(

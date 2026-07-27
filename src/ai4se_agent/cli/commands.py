@@ -1,4 +1,5 @@
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 # ── Command registry ──────────────────────────────────────────
 # Each entry: (name, description, handler)

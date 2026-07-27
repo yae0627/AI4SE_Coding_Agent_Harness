@@ -1,7 +1,6 @@
 from ai4se_agent.guardrails.base import Policy
 from ai4se_agent.types import Action, GuardrailResult
 
-
 PROTECTED_PATTERNS = ['.git/', 'node_modules/']
 
 

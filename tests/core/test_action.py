@@ -2,6 +2,7 @@
 from ai4se_agent.core.action import ActionParser, ActionValidator
 from ai4se_agent.types import Action
 
+
 def test_parse_valid_action():
     parser = ActionParser()
     result = parser.parse('action: write_file path=test.txt content=hello')

@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from ai4se_agent.core.sanitizer.path import PathNormalizer
 
 
@@ -50,8 +51,8 @@ def test_normalize_root_property():
 
 
 def test_normalize_absolute_path_inside_workspace():
-    import tempfile
     import os
+    import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         n = PathNormalizer(workspace_root=tmp)
         abs_path = os.path.join(tmp, "subdir", "file.txt")

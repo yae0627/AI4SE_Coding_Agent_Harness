@@ -107,9 +107,8 @@ class ConfigLoader:
         elif section == "model":
             if key == "active":
                 self._config.model.active = str(value)
-        elif section == "agent":
-            if key == "max_iterations":
-                self._config.agent.max_iterations = int(value)
+        elif section == "agent" and key == "max_iterations":
+            self._config.agent.max_iterations = int(value)
 
     def get(self, section: str, key: str) -> str | int:
         self.load()

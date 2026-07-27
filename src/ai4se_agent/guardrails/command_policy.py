@@ -1,7 +1,7 @@
 import re
+
 from ai4se_agent.guardrails.base import Policy
 from ai4se_agent.types import Action, GuardrailResult
-
 
 DANGEROUS_PATTERNS = [
     r'\brm\s+-rf\s+/', r'\bdd\b', r'\bwget\b', r'\bcurl\b.*[-][-]output',

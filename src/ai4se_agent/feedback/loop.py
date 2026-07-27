@@ -1,7 +1,7 @@
-from ai4se_agent.feedback.sensor import Sensor
 from ai4se_agent.feedback.classifier import FailureClassifier
 from ai4se_agent.feedback.planner import CorrectionPlanner
-from ai4se_agent.types import ToolResult, CorrectionPlan
+from ai4se_agent.feedback.sensor import Sensor
+from ai4se_agent.types import CorrectionPlan, ToolResult
 
 
 class FeedbackLoop:

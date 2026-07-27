@@ -1,10 +1,12 @@
-from typing import Any, Optional
+from typing import Any
+
 from openai import OpenAI
+
 from ai4se_agent.llm.base import LLMAdapter
 
 
 class OpenAIAdapter(LLMAdapter):
-    def __init__(self, api_key: str, base_url: Optional[str] = None, model: str = ""):
+    def __init__(self, api_key: str, base_url: str | None = None, model: str = ""):
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
 

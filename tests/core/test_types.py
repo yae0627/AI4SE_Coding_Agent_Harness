@@ -1,5 +1,13 @@
 # tests/core/test_types.py
-from ai4se_agent.types import Action, ToolResult, Feedback, GuardrailResult, CorrectionPlan, StopReason
+from ai4se_agent.types import (
+    Action,
+    CorrectionPlan,
+    Feedback,
+    GuardrailResult,
+    StopReason,
+    ToolResult,
+)
+
 
 def test_action_creation():
     action = Action(name="read_file", parameters={"path": "test.txt"})

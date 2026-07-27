@@ -3,7 +3,12 @@ import sys
 import time
 
 from ai4se_agent.cli.renderer import (
-    NullRenderer, Renderer, TerminalRenderer, _compact_params, separator, prompt_str
+    NullRenderer,
+    Renderer,
+    TerminalRenderer,
+    _compact_params,
+    prompt_str,
+    separator,
 )
 from ai4se_agent.core.events import AgentEvent
 from ai4se_agent.types import StopReason
@@ -211,9 +216,10 @@ def test_renderer_llm_message_multiline(capsys):
 
 
 def test_renderer_subscribe_includes_llm_message():
-    from ai4se_agent.core.event_bus import EventBus
     import io
     import sys
+
+    from ai4se_agent.core.event_bus import EventBus
     bus = EventBus()
     TerminalRenderer(event_bus=bus)
     captured = io.StringIO()

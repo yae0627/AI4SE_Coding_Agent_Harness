@@ -1,4 +1,4 @@
-from ai4se_agent.types import ToolResult, CorrectionPlan
+from ai4se_agent.types import CorrectionPlan, ToolResult
 
 
 class CorrectionPlanner:

@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional
 
 from ai4se_agent.types import Action, Plan
 
@@ -12,11 +11,11 @@ class AgentState:
     step_iteration: int = 0
     history: list = field(default_factory=list)
     feedback: list = field(default_factory=list)
-    last_action: Optional[Action] = None
-    last_observation: Optional[str] = None
+    last_action: Action | None = None
+    last_observation: str | None = None
     error_count: int = 0
     retry_count: int = 0
-    plan: Optional[Plan] = None
+    plan: Plan | None = None
 
     def record_turn(self, action: Action, observation: str) -> None:
         self.history.append({"role": "assistant", "content": f"action: {action.name} {action.parameters}"})

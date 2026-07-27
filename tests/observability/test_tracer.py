@@ -1,6 +1,7 @@
 import json
-from ai4se_agent.observability.tracer import Tracer, NullTracer
+
 from ai4se_agent.observability.events import StateEvent, ToolEvent
+from ai4se_agent.observability.tracer import NullTracer, Tracer
 
 
 def test_tracer_records_and_saves(tmp_path):

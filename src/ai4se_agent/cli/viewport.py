@@ -16,8 +16,7 @@ class Viewport:
             return 0, 0
         available = min(self.height, total_lines)
         max_offset = total_lines - available
-        if self.offset > max_offset:
-            self.offset = max_offset
+        self.offset = min(self.offset, max_offset)
         start = total_lines - available - self.offset
         end = start + available
         return max(0, start), end

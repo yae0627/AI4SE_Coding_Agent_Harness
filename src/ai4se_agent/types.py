@@ -23,15 +23,15 @@ class Action:
 class ParseResult:
     success: bool
     action: Optional["Action"] = None
-    message: Optional[str] = None
-    error: Optional[str] = None
+    message: str | None = None
+    error: str | None = None
 
 
 @dataclass
 class ToolResult:
     success: bool
     output: str
-    error: Optional[str] = None
+    error: str | None = None
     metadata: dict = field(default_factory=dict)
 
 

@@ -1,6 +1,7 @@
 from ai4se_agent.feedback.sensor import TestSensor
 from ai4se_agent.types import ToolResult
 
+
 def test_test_sensor_parses_failure():
     sensor = TestSensor()
     result = ToolResult(success=False, output="FAILED test_order.py::test_validate - AssertionError: expected True got False",

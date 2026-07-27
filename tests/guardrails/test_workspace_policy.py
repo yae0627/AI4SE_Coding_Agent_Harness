@@ -1,6 +1,7 @@
 from ai4se_agent.guardrails.workspace_policy import WorkspacePolicy
 from ai4se_agent.types import Action
 
+
 def test_block_path_escape(tmp_path):
     policy = WorkspacePolicy(workspace=str(tmp_path))
     action = Action(name="read_file", parameters={"path": str(tmp_path / "../../etc/passwd")})
