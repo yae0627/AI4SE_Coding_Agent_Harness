@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 class HarnessStateMachine:
     states = [
         "IDLE", "CONTEXT_ORG", "LLM_CALL", "ACTION_PARSE",
-        "GUARDRAIL", "WAIT_APPROVAL", "TOOL_EXEC", "TOOL_ERROR",
+        "GUARDRAIL", "WAIT_APPROVAL", "WAIT_INPUT", "TOOL_EXEC", "TOOL_ERROR",
         "FEEDBACK", "MEMORY_UPDATE", "RESPOND", "STOP"
     ]
 
@@ -102,6 +102,8 @@ class HarnessStateMachine:
         self.machine.add_transition("continue_loop", "MEMORY_UPDATE", "CONTEXT_ORG", after="_on_context_org")
         self.machine.add_transition("respond_to_user", "ACTION_PARSE", "RESPOND", after="_on_respond")
         self.machine.add_transition("continue_after_respond", "RESPOND", "CONTEXT_ORG", after="_on_context_org")
+        self.machine.add_transition("request_input", "ACTION_PARSE", "WAIT_INPUT", after="_on_wait_input")
+        self.machine.add_transition("input_received", "WAIT_INPUT", "CONTEXT_ORG", after="_on_context_org")
         self.machine.add_transition("stop", "*", "STOP", after="_on_stop")
 
     def run(self) -> dict:
@@ -175,6 +177,11 @@ class HarnessStateMachine:
         if action.name == "finish":
             self.stop_reason = StopReason.SUCCESS
             self.stop()
+            return
+        if action.name == "ask":
+            self._pending_action = action
+            self._emit("LLM_MESSAGE", {"message": action.parameters.get("question", "")})
+            self.request_input()
             return
         if action.name == "respond":
             self._pending_action = action
@@ -297,6 +304,21 @@ class HarnessStateMachine:
             if user_input:
                 self.state.record_feedback(user_input)
         self.continue_after_respond()
+
+    def _on_wait_input(self) -> None:
+        """Wait for user response to an ask action."""
+        assert self._pending_action is not None
+        if self._interactive:
+            try:
+                user_input = input("> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                self.stop_reason = StopReason.USER_CANCEL
+                self.stop()
+                return
+            if user_input:
+                self.state.record_feedback(user_input)
+                self.state.history.append({"role": "user", "content": user_input})
+        self.input_received()
 
     def _on_memory_update(self) -> None:
         self._emit("MEMORY_WRITE", {})

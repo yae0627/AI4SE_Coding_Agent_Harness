@@ -235,6 +235,72 @@ def test_llm_message_finish_with_message():
     assert "Analysis complete" in message_events[0]["message"]
 
 
+def test_ask_action_enters_wait_input():
+    """ask action should emit LLM_MESSAGE with the question and enter WAIT_INPUT."""
+    bus = EventBus()
+    message_events = []
+    bus.subscribe("LLM_MESSAGE", lambda e: message_events.append(e.payload))
+
+    ch = InterruptChannel()
+    llm = MockAdapter(responses=[
+        '{"action": {"name": "ask", "parameters": {"question": "Which file should I check?"}}}',
+        '{"action": {"name": "finish", "parameters": {}}}',
+    ])
+    registry = ToolRegistry()
+    state = AgentState(goal="test ask")
+
+    import threading
+    def answer_later():
+        import time
+        time.sleep(0.05)
+        ch.send_approval(True)  # reuse approval queue for input signal
+
+    threading.Thread(target=answer_later, daemon=True).start()
+
+    sm = HarnessStateMachine(
+        agent_state=state, llm_adapter=llm,
+        action_parser=ActionParser(), action_validator=ActionValidator(),
+        tool_registry=registry, guardrail_engine=GuardrailEngine(),
+        feedback_loop=None, max_iterations=5, event_bus=bus,
+        interrupt=ch, interactive=False,
+    )
+    sm.run()
+    # ask question should be emitted as LLM_MESSAGE
+    assert len(message_events) >= 1
+    assert "Which file" in str(message_events[0]["message"])
+
+
+def test_existing_respond_tests_still_pass():
+    """Backward compat: old respond action format still works as RESPOND state."""
+    bus = EventBus()
+    respond_events = []
+    bus.subscribe("RESPOND", lambda e: respond_events.append(e.payload))
+
+    llm = MockAdapter(responses=[
+        '{"action": "respond", "parameters": {"message": "I found the issue in auth.py"}}',
+        '{"action": {"name": "finish", "parameters": {}}}',
+    ])
+    registry = ToolRegistry()
+    registry.register(ReadFileTool())
+    state = AgentState(goal="debug auth")
+    sm = HarnessStateMachine(
+        agent_state=state,
+        llm_adapter=llm,
+        action_parser=ActionParser(),
+        action_validator=ActionValidator(),
+        tool_registry=registry,
+        guardrail_engine=GuardrailEngine(),
+        feedback_loop=None,
+        max_iterations=5,
+        event_bus=bus,
+        interactive=False,
+    )
+    result = sm.run()
+    assert result["status"] == "success"
+    assert len(respond_events) >= 1
+    assert "auth.py" in respond_events[0]["message"]
+
+
 def test_old_format_action_still_works():
     """Old format {'action': 'tool_name', 'parameters': {...}} still works."""
     bus = EventBus()
