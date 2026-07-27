@@ -79,6 +79,70 @@ class SessionManager:
         agent_thread: threading.Thread | None = None
         ch: InterruptChannel | None = None
 
+        def _read_idle() -> str:
+            """Read input with > prompt. When / is typed, show live
+            command preview below the input line."""
+            try:
+                import msvcrt
+            except ImportError:
+                return input("> ").strip()
+
+            from ai4se_agent.cli.commands import matching_commands
+
+            print("\033[1;37m> \033[0m", end="", flush=True)
+            chars: list[str] = []
+            preview_lines = 0
+            max_w = shutil.get_terminal_size().columns
+
+            def _draw_preview(matches):
+                """Print matching commands below the input line, return line count."""
+                if not matches:
+                    return 0
+                print()
+                for name, desc in matches:
+                    line = f"  \033[2m{name:<12s} {desc}\033[0m"
+                    print(line[:max_w - 1])
+                return len(matches)
+
+            def _clear_preview(n):
+                """Erase n preview lines + the blank line below input."""
+                if n <= 0:
+                    return
+                # Move down to first preview line, clear each, move back
+                for _ in range(n + 1):
+                    print("\033[2K")  # clear current line
+                    if _ < n:
+                        print("\033[1B", end="")  # move down (except last)
+                # Move cursor back up
+                print(f"\033[{n + 1}A", end="")
+                # Move to end of input line
+                col = 2 + len("".join(chars))  # "> " + typed
+                if col < max_w:
+                    print(f"\033[{col}G", end="")
+                print(flush=True)
+
+            while True:
+                ch = msvcrt.getwch()
+                if ch in ("\r", "\n"):
+                    _clear_preview(preview_lines)
+                    print()
+                    return "".join(chars).strip()
+                if ch == "\x08":
+                    if chars:
+                        chars.pop()
+                        print("\b \b", end="", flush=True)
+                elif ch == "\x03":
+                    _clear_preview(preview_lines)
+                    raise KeyboardInterrupt
+                elif ch.isprintable():
+                    chars.append(ch)
+                    print(f"\033[1;37m{ch}\033[0m", end="", flush=True)
+
+                line = "".join(chars)
+                matches = matching_commands(line) if line.startswith("/") else []
+                _clear_preview(preview_lines)
+                preview_lines = _draw_preview(matches)
+
         def _read_running(current_thread) -> str:
             """Poll keyboard during agent execution. Returns immediately
             when the agent finishes, so the > prompt appears without
@@ -116,7 +180,7 @@ class SessionManager:
                 if self._agent_running:
                     line = _read_running(agent_thread)
                 else:
-                    line = input("> ").strip()
+                    line = _read_idle()
             except (EOFError, KeyboardInterrupt):
                 if self._agent_running and ch:
                     ch.request_stop()
@@ -170,8 +234,6 @@ class SessionManager:
                     break
                 continue
 
-            # Overwrite terminal echo with bold version on the same line
-            print(f"\033[1A\033[2K\033[1;37m> {line}\033[0m")
             print()
             ch = InterruptChannel()
             session._interrupt = ch
