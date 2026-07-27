@@ -1,4 +1,5 @@
 import shutil
+import sys
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -89,59 +90,42 @@ class SessionManager:
 
             from ai4se_agent.cli.commands import matching_commands
 
-            print("\033[1;37m> \033[0m", end="", flush=True)
             chars: list[str] = []
-            preview_lines = 0
             max_w = shutil.get_terminal_size().columns
 
-            def _draw_preview(matches):
-                """Print matching commands below the input line, return line count."""
-                if not matches:
-                    return 0
-                print()
-                for name, desc in matches:
-                    line = f"  \033[2m{name:<12s} {desc}\033[0m"
-                    print(line[:max_w - 1])
-                return len(matches)
-
-            def _clear_preview(n):
-                """Erase n preview lines + the blank line below input."""
-                if n <= 0:
-                    return
-                # Move down to first preview line, clear each, move back
-                for _ in range(n + 1):
-                    print("\033[2K")  # clear current line
-                    if _ < n:
-                        print("\033[1B", end="")  # move down (except last)
-                # Move cursor back up
-                print(f"\033[{n + 1}A", end="")
-                # Move to end of input line
-                col = 2 + len("".join(chars))  # "> " + typed
-                if col < max_w:
-                    print(f"\033[{col}G", end="")
-                print(flush=True)
+            def _redraw():
+                """Reprint the input line + preview from scratch.
+                Uses \\r + \\033[J (erase-to-bottom) which are reliably
+                supported on Windows console."""
+                line = "".join(chars)
+                matches = matching_commands(line) if line.startswith("/") else []
+                # Go to column 0 of current line
+                sys.stdout.write("\r")
+                # Reprint input line and clear everything below
+                sys.stdout.write(f"\033[2K\033[1;37m> {line}\033[0m")
+                sys.stdout.write("\033[J")
+                if matches:
+                    sys.stdout.write("\n")
+                    for name, desc in matches:
+                        entry = f"  \033[2m{name:<12s} {desc}\033[0m"
+                        sys.stdout.write(entry[:max_w - 1] + "\n")
+                sys.stdout.flush()
 
             while True:
                 ch = msvcrt.getwch()
                 if ch in ("\r", "\n"):
-                    _clear_preview(preview_lines)
-                    print()
+                    _redraw()
+                    sys.stdout.write("\n")
+                    sys.stdout.flush()
                     return "".join(chars).strip()
                 if ch == "\x08":
                     if chars:
                         chars.pop()
-                        print("\b \b", end="", flush=True)
                 elif ch == "\x03":
-                    _clear_preview(preview_lines)
                     raise KeyboardInterrupt
                 elif ch.isprintable():
                     chars.append(ch)
-                    print(f"\033[1;37m{ch}\033[0m", end="", flush=True)
-
-                line = "".join(chars)
-                matches = matching_commands(line) if line.startswith("/") else []
-                _clear_preview(preview_lines)
-                preview_lines = _draw_preview(matches)
+                _redraw()
 
         def _read_running(current_thread) -> str:
             """Poll keyboard during agent execution. Returns immediately
