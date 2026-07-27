@@ -124,7 +124,7 @@ def test_stop_requested_cancels_agent():
 
     llm = MockAdapter(responses=[
         '{"action": "shell", "parameters": {"command": "echo step1"}}',
-        '{"action": "shell", "parameters": {"command": "echo step2"}}',
+    ] * 6 + [
         '{"action": "finish", "parameters": {}}',
     ])
     registry = ToolRegistry()
@@ -134,7 +134,7 @@ def test_stop_requested_cancels_agent():
     import threading
     def request_stop_later():
         import time
-        time.sleep(0.05)
+        time.sleep(0.01)
         ch.request_stop()
 
     threading.Thread(target=request_stop_later, daemon=True).start()
