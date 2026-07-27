@@ -94,21 +94,25 @@ class SessionManager:
             max_w = shutil.get_terminal_size().columns
 
             def _redraw():
-                """Reprint the input line + preview from scratch.
-                Uses \\r + \\033[J (erase-to-bottom) which are reliably
-                supported on Windows console."""
+                """Redraw input line + preview. Always ends with cursor
+                at the correct position on the input line."""
                 line = "".join(chars)
                 matches = matching_commands(line) if line.startswith("/") else []
-                # Go to column 0 of current line
-                sys.stdout.write("\r")
-                # Reprint input line and clear everything below
-                sys.stdout.write(f"\033[2K\033[1;37m> {line}\033[0m")
+                # Clear and redraw from column 0
+                sys.stdout.write("\r\033[2K")
+                sys.stdout.write(f"\033[1;37m> {line}\033[0m")
                 sys.stdout.write("\033[J")
+                count = 0
                 if matches:
                     sys.stdout.write("\n")
                     for name, desc in matches:
                         entry = f"  \033[2m{name:<12s} {desc}\033[0m"
                         sys.stdout.write(entry[:max_w - 1] + "\n")
+                        count += 1
+                # Move cursor back to end of input line
+                if count > 0:
+                    sys.stdout.write(f"\033[{count}A")
+                sys.stdout.write(f"\r\033[{2 + len(line)}C")
                 sys.stdout.flush()
 
             while True:
