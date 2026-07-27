@@ -122,11 +122,9 @@ def test_stop_requested_cancels_agent():
     events: list[str] = []
     bus.subscribe("AGENT_STOP", lambda e: events.append(e.payload.get("reason", "")))
 
-    llm = MockAdapter(responses=[
-        '{"action": "shell", "parameters": {"command": "echo step1"}}',
-    ] * 6 + [
-        '{"action": "finish", "parameters": {}}',
-    ])
+    # Keep the agent busy long enough for the stop signal to arrive
+    shell_resp = '{"action": "shell", "parameters": {"command": "echo x"}}'
+    llm = MockAdapter(responses=[shell_resp] * 20)
     registry = ToolRegistry()
     registry.register(ShellTool())
     state = AgentState(goal="test")
@@ -143,7 +141,7 @@ def test_stop_requested_cancels_agent():
         agent_state=state, llm_adapter=llm,
         action_parser=ActionParser(), action_validator=ActionValidator(),
         tool_registry=registry, guardrail_engine=GuardrailEngine(),
-        feedback_loop=None, max_iterations=10, event_bus=bus,
+        feedback_loop=None, max_iterations=30, event_bus=bus,
         interrupt=ch, interactive=False,
     )
     machine.run()
