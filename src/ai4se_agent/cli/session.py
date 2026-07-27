@@ -118,7 +118,11 @@ class SessionManager:
                 elif line.startswith("/"):
                     handle_command(line, self)
                 elif line:
-                    print(f"\033[2m  ● Agent is busy  ·  /stop  /approve  /reject\033[0m")
+                    w = min(shutil.get_terminal_size().columns, 60)
+                    print(f"\033[33m  " + "─" * (w - 4) + "\033[0m")
+                    print(f"\033[33m  ● Running\033[0m  \033[2mtype /stop to cancel\033[0m")
+                    print(f"\033[33m  " + "─" * (w - 4) + "\033[0m")
+                    print()
                 continue
 
             # Agent idle → new task or command
