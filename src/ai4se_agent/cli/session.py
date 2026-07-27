@@ -118,7 +118,7 @@ class SessionManager:
                 elif line.startswith("/"):
                     handle_command(line, self)
                 elif line:
-                    print("  Agent is running. /stop /approve /reject")
+                    print(f"\033[2m  ● Agent is busy  ·  /stop  /approve  /reject\033[0m")
                 continue
 
             # Agent idle → new task or command
@@ -144,6 +144,13 @@ class SessionManager:
 
             agent_thread = threading.Thread(target=run_task, args=(line,), daemon=True)
             agent_thread.start()
+
+            # Visual indicator that agent is now running
+            w = min(shutil.get_terminal_size().columns, 60)
+            print(f"\033[33m  " + "─" * (w - 4) + "\033[0m")
+            print(f"\033[33m  ● Running\033[0m  \033[2mtype /stop to cancel\033[0m")
+            print(f"\033[33m  " + "─" * (w - 4) + "\033[0m")
+            print()
 
         bus.publish(AgentEvent(type="SESSION_END", iteration=0, state="STOP",
                                payload={"reason": "user_exit"}))

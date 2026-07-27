@@ -165,10 +165,12 @@ class TerminalRenderer(Renderer):
     def on_stop(self, reason: StopReason, iteration: int) -> None:
         w = shutil.get_terminal_size().columns
         self._print(_c(_DIM, "-" * min(w, 60)))
+        self._print("")
         self._print(_c(_DIM,
             f"  done · {reason.value} · {iteration} iterations · "
             f"{self._total_elapsed_ms / 1000:.1f}s"
         ))
+        self._print("")
 
     def on_token_usage(self, iteration: int, prompt_tokens: int, completion_tokens: int) -> None:
         self._total_tokens += prompt_tokens + completion_tokens
@@ -285,7 +287,9 @@ class TerminalRenderer(Renderer):
         iterations = event.payload.get("iterations", 0)
         w = shutil.get_terminal_size().columns
         self._print(_c(_DIM, "-" * min(w, 60)))
+        self._print("")
         self._print(_c(_DIM,
             f"  done · {reason} · {iterations} iterations · "
             f"{self._total_elapsed_ms / 1000:.1f}s"
         ))
+        self._print("")
