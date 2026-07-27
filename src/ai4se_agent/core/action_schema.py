@@ -1,31 +1,29 @@
 """Control action schemas — actions handled by FSM, not ToolRegistry.
 
-These are merged into the LLM prompt so the model knows about respond/finish
+These are merged into the LLM prompt so the model knows about ask/finish
 alongside the dynamically-registered tool schemas.
 """
 
 CONTROL_SCHEMAS = [
     {
-        "name": "respond",
+        "name": "ask",
         "_category": "control",
-        "description": "Send a message to the user. Use this to explain reasoning, report progress, ask questions, or reply to conversational messages.",
+        "description": "Ask the user a question and wait for their response. Use this when you need clarification, a decision, or additional information before proceeding.",
         "parameters": {
             "type": "object",
             "properties": {
-                "message": {"type": "string", "description": "The message to send to the user"}
+                "question": {"type": "string", "description": "The question to ask the user"}
             },
-            "required": ["message"]
+            "required": ["question"]
         }
     },
     {
         "name": "finish",
         "_category": "control",
-        "description": "Complete the current task. Call this when all requested work is finished.",
+        "description": "Complete the current task. Use the message field to summarize what was accomplished.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "summary": {"type": "string", "description": "Brief summary of what was accomplished"}
-            },
+            "properties": {},
             "required": []
         }
     },

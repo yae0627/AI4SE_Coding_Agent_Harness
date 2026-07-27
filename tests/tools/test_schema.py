@@ -54,3 +54,11 @@ def test_parse_result_failure():
     assert r.success is False
     assert r.action is None
     assert r.error == "bad json"
+
+
+def test_control_schemas_include_ask_not_respond():
+    from ai4se_agent.core.action_schema import CONTROL_SCHEMAS
+    names = [s["name"] for s in CONTROL_SCHEMAS]
+    assert "ask" in names, "CONTROL_SCHEMAS should include ask"
+    assert "finish" in names, "CONTROL_SCHEMAS should include finish"
+    assert "respond" not in names, "CONTROL_SCHEMAS should NOT include respond (deprecated)"
