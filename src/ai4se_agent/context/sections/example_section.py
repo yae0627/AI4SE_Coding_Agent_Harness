@@ -7,9 +7,12 @@ class ExampleSection(PromptSection):
         return (
             "## Example Session\n\n"
             "User: create a hello world program\n\n"
-            '{"action": "respond", "parameters": {"message": "I will create a hello.cpp file, compile it, and run it."}}\n'
-            '{"action": "write_file", "parameters": {"path": "main.cpp", "content": "#include <iostream>\\nint main() { std::cout << \\"hello\\"; }\\n"}}\n'
-            '{"action": "shell", "parameters": {"command": "g++ -o main main.cpp"}}\n'
-            '{"action": "shell", "parameters": {"command": "./main"}}\n'
-            '{"action": "finish", "parameters": {"summary": "Compiled and ran successfully"}}'
+            '  {"message": "I will create a hello.cpp file, compile it, and run it.", '
+            '"action": {"name": "write_file", "parameters": {"path": "main.cpp", '
+            '"content": "#include <iostream>\\nint main() { std::cout << \\"hello\\"; }\\n"}}}\n\n'
+            '  {"message": "File written, now compiling.", '
+            '"action": {"name": "shell", "parameters": {"command": "g++ -o main main.cpp"}}}\n\n'
+            '  {"action": {"name": "shell", "parameters": {"command": "./main"}}}\n\n'
+            '  {"message": "Compiled and ran successfully. Output: hello", '
+            '"action": {"name": "finish", "parameters": {}}}'
         )

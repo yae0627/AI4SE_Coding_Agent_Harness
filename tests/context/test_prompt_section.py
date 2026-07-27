@@ -112,7 +112,10 @@ def test_example_section_has_finish():
     section = ExampleSection()
     result = section.build(PromptContext(tools=[], goal=""))
     assert "finish" in result
-    assert "respond" in result
+    assert "write_file" in result
+    assert "shell" in result
+    # Old respond action no longer used — message field replaces it
+    assert '"message"' in result
 
 
 def test_workspace_section_shows_os():
