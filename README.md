@@ -6,7 +6,7 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 
 ## 项目状态
 
-✅ **Action Schema 分离完成** — 188 个测试通过。CONTROL_SCHEMAS 独立于 ToolRegistry，prompt 自动包含 respond/finish。
+✅ **Communication Channel 升级完成** — 220 个测试通过。message+action 双通道协议，ConversationMemory 跨轮次记忆，ask/WAIT_INPUT 状态机，LLM_MESSAGE 事件驱动。
 
 ## 架构
 
