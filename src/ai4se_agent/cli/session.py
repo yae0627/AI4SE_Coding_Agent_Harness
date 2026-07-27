@@ -93,8 +93,8 @@ class SessionManager:
             chars: list[str] = []
             max_w = shutil.get_terminal_size().columns
 
-            # Show initial prompt
-            sys.stdout.write("\033[1;37m> \033[0m")
+            # Show initial prompt with leading blank line
+            sys.stdout.write("\n\033[1;37m> \033[0m")
             sys.stdout.flush()
 
             def _redraw():
