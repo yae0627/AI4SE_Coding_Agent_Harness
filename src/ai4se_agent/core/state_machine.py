@@ -114,7 +114,7 @@ class HarnessStateMachine:
             self.stop()
             return
         self.state.increment_iteration()
-        if self.state.iteration > self.max_iterations:
+        if self.state.iteration >= self.max_iterations:
             self.stop_reason = StopReason.MAX_ITERATION
             self.stop()
             return
@@ -195,7 +195,6 @@ class HarnessStateMachine:
             self._emit("GUARDRAIL_DENY", {"policy": result.policy, "reason": result.reason})
             self.deny_action()
         elif result.verdict == "REQUIRE_APPROVAL":
-            self._emit("APPROVAL_REQUIRED", {"policy": result.policy, "reason": result.reason})
             self.request_approval()
         else:
             self._emit("GUARDRAIL_PASS", {"policy": result.policy})
