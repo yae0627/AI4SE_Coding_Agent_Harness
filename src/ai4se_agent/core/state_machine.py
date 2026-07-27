@@ -152,11 +152,25 @@ class HarnessStateMachine:
                 f"Your last response could not be parsed as a valid action. "
                 f"Error: {result.error}. "
                 f"Please respond with a JSON object: "
-                f'{{"action": "<tool_name>", "parameters": {{...}}}}. '
+                f'{{"message": "<optional text>", "action": {{"name": "<tool_name>", "parameters": {{...}}}}}}. '
                 f"Make sure all double quotes inside string values are escaped with backslash (\\\")."
             )
             self.retry_parse()
             return
+
+        # Emit message if present (before action processing, so renderer shows it)
+        if result.message:
+            self._emit("LLM_MESSAGE", {"message": result.message})
+
+        # Message-only response (no action) — loop back for next LLM response
+        if result.action is None:
+            self.state.history.append({
+                "role": "assistant", "content": result.message or "",
+                "type": "message"
+            })
+            self.retry_parse()
+            return
+
         action = result.action
         if action.name == "finish":
             self.stop_reason = StopReason.SUCCESS
@@ -164,6 +178,7 @@ class HarnessStateMachine:
             return
         if action.name == "respond":
             self._pending_action = action
+            self._emit("LLM_MESSAGE", {"message": action.parameters.get("message", "")})
             self._emit("RESPOND", {"message": action.parameters.get("message", "")})
             self.respond_to_user()
             return

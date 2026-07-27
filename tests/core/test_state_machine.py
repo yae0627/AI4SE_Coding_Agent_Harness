@@ -187,3 +187,74 @@ def test_hitl_approval_via_queue():
     machine.run()
     assert len(approval_events) >= 1
     assert approval_events[0]["policy"] == "GitPolicy"
+
+
+def test_llm_message_event_emitted():
+    """When LLM response has a message field, LLM_MESSAGE event is emitted."""
+    bus = EventBus()
+    message_events = []
+    bus.subscribe("LLM_MESSAGE", lambda e: message_events.append(e.payload))
+
+    llm = MockAdapter(responses=[
+        '{"message": "Let me check the file.", "action": {"name": "shell", "parameters": {"command": "echo ok"}}}',
+        '{"action": {"name": "finish", "parameters": {}}}',
+    ])
+    registry = ToolRegistry()
+    registry.register(ShellTool())
+
+    sm = HarnessStateMachine(
+        agent_state=AgentState(goal="test message"),
+        llm_adapter=llm, action_parser=ActionParser(),
+        action_validator=ActionValidator(), tool_registry=registry,
+        guardrail_engine=GuardrailEngine(), feedback_loop=None,
+        max_iterations=5, event_bus=bus, interactive=False,
+    )
+    sm.run()
+    assert len(message_events) >= 1, f"expected at least 1 LLM_MESSAGE, got {len(message_events)}"
+    assert "Let me check the file" in message_events[0]["message"]
+
+
+def test_llm_message_finish_with_message():
+    """finish action with a message field — message is emitted before STOP."""
+    bus = EventBus()
+    message_events = []
+    bus.subscribe("LLM_MESSAGE", lambda e: message_events.append(e.payload))
+
+    llm = MockAdapter(responses=[
+        '{"message": "Analysis complete. Found 3 bugs.", "action": {"name": "finish", "parameters": {}}}',
+    ])
+    sm = HarnessStateMachine(
+        agent_state=AgentState(goal="test finish message"),
+        llm_adapter=llm, action_parser=ActionParser(),
+        action_validator=ActionValidator(), tool_registry=ToolRegistry(),
+        guardrail_engine=GuardrailEngine(), feedback_loop=None,
+        max_iterations=5, event_bus=bus, interactive=False,
+    )
+    sm.run()
+    assert len(message_events) >= 1
+    assert "Analysis complete" in message_events[0]["message"]
+
+
+def test_old_format_action_still_works():
+    """Old format {'action': 'tool_name', 'parameters': {...}} still works."""
+    bus = EventBus()
+    tool_events = []
+    bus.subscribe("TOOL_END", lambda e: tool_events.append(e.payload))
+
+    llm = MockAdapter(responses=[
+        '{"action": "shell", "parameters": {"command": "echo old_format"}}',
+        '{"action": {"name": "finish", "parameters": {}}}',
+    ])
+    registry = ToolRegistry()
+    registry.register(ShellTool())
+
+    sm = HarnessStateMachine(
+        agent_state=AgentState(goal="old format"),
+        llm_adapter=llm, action_parser=ActionParser(),
+        action_validator=ActionValidator(), tool_registry=registry,
+        guardrail_engine=GuardrailEngine(), feedback_loop=None,
+        max_iterations=5, event_bus=bus, interactive=False,
+    )
+    r = sm.run()
+    assert r["status"] == "success"
+    assert len(tool_events) >= 1
