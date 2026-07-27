@@ -167,9 +167,12 @@ class HarnessStateMachine:
                 "role": "assistant", "content": result.message, "type": "message"
             })
 
-        # Message-only response (no action) — loop back for next LLM response
+        # Message-only response (no action) — stop the turn and wait for user input.
+        # Looping back to CONTEXT_ORG causes greeting-loops: the LLM sees its own
+        # response in history and generates another greeting, ad infinitum.
         if result.action is None:
-            self.retry_parse()
+            self.stop_reason = StopReason.SUCCESS
+            self.stop()
             return
 
         action = result.action
