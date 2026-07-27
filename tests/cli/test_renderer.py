@@ -6,7 +6,7 @@ from ai4se_agent.cli.renderer import (
     NullRenderer, Renderer, TerminalRenderer, _compact_params, separator, prompt_str
 )
 from ai4se_agent.core.events import AgentEvent
-from ai4se_agent.types import StopReason, ToolResult
+from ai4se_agent.types import StopReason
 
 
 def test_null_renderer_does_nothing():
@@ -212,9 +212,10 @@ def test_renderer_llm_message_multiline(capsys):
 
 def test_renderer_subscribe_includes_llm_message():
     from ai4se_agent.core.event_bus import EventBus
-    import io, sys
+    import io
+    import sys
     bus = EventBus()
-    r = TerminalRenderer(event_bus=bus)
+    TerminalRenderer(event_bus=bus)
     captured = io.StringIO()
     old_stdout = sys.stdout
     sys.stdout = captured

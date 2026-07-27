@@ -1,4 +1,4 @@
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 
 
 class PathNormalizer:

@@ -5,7 +5,6 @@ Character-by-character input via msvcrt (Windows) or tty (Unix).
 """
 import shutil
 import sys
-import os
 
 from ai4se_agent.cli.output_buffer import OutputBuffer
 from ai4se_agent.cli.viewport import Viewport

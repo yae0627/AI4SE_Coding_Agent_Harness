@@ -33,7 +33,6 @@ def test_normalize_windows_drive_path():
 def test_normalize_path_escape_rejected():
     """Path escaping workspace via .. is rejected."""
     import tempfile
-    import os
     with tempfile.TemporaryDirectory() as tmp:
         n = PathNormalizer(workspace_root=tmp)
         try:

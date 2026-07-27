@@ -86,7 +86,7 @@ def test_conversation_memory_records_full_turn_history():
     config.set("provider", "name", "mock")
 
     runtime = AgentRuntime(goal="read a file", memory=mem, config=config, event_bus=bus)
-    result = runtime.run()
+    runtime.run()
 
     messages = mem.get_all()
     roles = [m["role"] for m in messages]

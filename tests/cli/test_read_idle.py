@@ -1,7 +1,8 @@
 """Verify _read_idle behavior by testing its internal logic directly.
 We can't easily test msvcrt input from a non-interactive test, but we can
 verify the redraw logic and command matching chain."""
-import sys, shutil
+import sys
+import shutil
 
 
 def test_redraw_output_contains_input_and_preview(capsys):

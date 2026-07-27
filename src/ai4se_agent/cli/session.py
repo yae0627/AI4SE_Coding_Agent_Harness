@@ -1,11 +1,10 @@
 import shutil
 import sys
 import threading
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ai4se_agent.cli.commands import handle_command
-from ai4se_agent.cli.renderer import NullRenderer, Renderer, separator, prompt_str
+from ai4se_agent.cli.renderer import NullRenderer, Renderer
 from ai4se_agent.config.loader import ConfigLoader
 from ai4se_agent.core.agent_state import AgentState
 from ai4se_agent.core.events import AgentEvent
@@ -211,9 +210,9 @@ class SessionManager:
                     handle_command(line, self)
                 elif line:
                     w = min(shutil.get_terminal_size().columns, 60)
-                    print(f"\033[33m  " + "─" * (w - 4) + "\033[0m")
-                    print(f"\033[33m  ● Running\033[0m  \033[2mtype /stop to cancel\033[0m")
-                    print(f"\033[33m  " + "─" * (w - 4) + "\033[0m")
+                    print("\033[33m  " + "─" * (w - 4) + "\033[0m")
+                    print("\033[33m  ● Running\033[0m  \033[2mtype /stop to cancel\033[0m")
+                    print("\033[33m  " + "─" * (w - 4) + "\033[0m")
                     print()
                 continue
 
@@ -240,9 +239,9 @@ class SessionManager:
 
             # Visual indicator that agent is now running
             w = min(shutil.get_terminal_size().columns, 60)
-            print(f"\033[33m  " + "─" * (w - 4) + "\033[0m")
-            print(f"\033[33m  ● Running\033[0m  \033[2mtype /stop to cancel\033[0m")
-            print(f"\033[33m  " + "─" * (w - 4) + "\033[0m")
+            print("\033[33m  " + "─" * (w - 4) + "\033[0m")
+            print("\033[33m  ● Running\033[0m  \033[2mtype /stop to cancel\033[0m")
+            print("\033[33m  " + "─" * (w - 4) + "\033[0m")
             print()
 
         bus.publish(AgentEvent(type="SESSION_END", iteration=0, state="STOP",
