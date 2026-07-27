@@ -787,3 +787,69 @@ Layer 4: JSON escape recovery（ActionParser._repair_escapes）
 - Path escape (`../../etc/passwd`) → ValueError
 - Valid escapes (`\n`, `\t`, `\"`) not modified
 - `_repair_escapes` + `_repair_json` chain working correctly
+
+## 阶段十九：UX 修复系列（2026-07-27）
+
+### 背景
+
+用户在真实交互中发现多个 UI/UX 问题，逐个修复。
+
+### 修复列表
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| banner 简陋 | `start()` 只打印一行 | ASCII 框 + agent 名 + 模型 |
+| 用户输入和 LLM 输出混在一起 | 无视觉区分 | `> ` 白色粗体前缀 |
+| agent 消息无标识 | `  text` 和其他输出相同 | `... ` dim 前缀 |
+| 工具成功无输出显示 | 只显示 `ok`，不显示内容 | 成功也显示前 3 行 dim 输出 |
+| Ctrl+C 中断 agent 后无法继续 | `KeyboardInterrupt` → `break` 退出循环 | agent 运行时 Ctrl+C → stop + join + continue |
+| "你好" 造成死循环 | message-only → retry_parse → LLM 看到自己的问候又回复 | message-only → stop（success） |
+| `head -100` 等 Linux 命令 | LLM 不知道在 Windows 上 | WorkspaceSection + ShellTool schema 注 OS 提示 |
+| g++ 输出 GBK 编码崩溃 | `subprocess.run(text=True)` 用 GBK 解码 | `errors='replace'` 替代崩溃 |
+| tool error 不传给 LLM | `record_turn` 只传 `output`，不传 `error` | 合并 error 到 observation |
+| 重试耗尽 → STOP，LLM 无机会修正 | `_on_tool_error` 盲重试 3 次后 repeated_failure | 重试 2 次 → error→feedback → CONTEXT_ORG |
+
+## 阶段二十：Plan-as-Tool 机制（2026-07-27）
+
+### 背景
+
+`deepseek-v4-flash` 在"写归并排序（header+impl+test+编译+运行）"任务中反复只写 header，20 轮耗尽。根因不是模型太弱，而是**harness 没给 LLM 提供计划能力**——LLM 每次调用只能看到 history（"已经做了什么"），看不到 plan（"还需要做什么"）。
+
+### 方案调研
+
+对比两大成熟方案：
+
+**Claude Code**：plan 是工具（TodoWrite/TaskCreate），LLM 完全自主控制进度。harness 只负责存储、渲染、提醒。核心教训——随着模型变强，强制 plan 机制反而成为阻碍（LLM 把计划当"章程"而非"指南"）。
+
+**OpenManus**：PlanningTool + PlanningFlow。LLM 通过 plan_create/plan_update 管理计划，PlanningFlow 负责步骤调度和重新规划。
+
+共同模式：LLM 控制计划生命周期，harness 提供工具和可视化。
+
+### 设计决策
+
+| 决策点 | 选择 | 理由 |
+|--------|------|------|
+| Plan 是什么 | 工具（plan_create/plan_update），不是状态机状态 | LLM 自主控制，不被 harness 强制 |
+| 进度追踪 | LLM 用 plan_update 手动标记 | harness 自动标记会误判步骤边界 |
+| 迭代计数 | 双层（全局 40 + 单步 12） | 单步超限 → 标记 failed → LLM 重新规划，不全局 STOP |
+| 无 plan 时 | 行为完全不变 | 向后兼容 |
+
+### 实现
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `types.py` | +35 行 | Plan, PlanStep dataclass |
+| `core/agent_state.py` | +4 行 | plan 字段 + step_iteration 计数器 |
+| `core/action_schema.py` | +25 行 | plan_create, plan_update control schema |
+| `core/state_machine.py` | +60 行 | plan action 处理 + 双层迭代计数器 |
+| `context/prompt_context.py` | +1 行 | plan 字段 |
+| `context/builder.py` | +2 行 | PlanSection 注册 + plan 传递 |
+| `context/sections/plan_section.py` | 新建 | PlanSection（[ ]/[>]/[x]/[!] 注入） |
+| `cli/renderer.py` | +12 行 | PLAN_UPDATED 事件渲染 |
+| `cli/session.py` | +1 行 | PLAN_UPDATED 订阅 |
+
+### 验证结果
+
+- **241 测试全部通过**（+3 新增：plan create + step limit + no-plan fallback）
+- Mock 验证：LLM 创建 2 步计划 → 逐步标记完成 → 成功 finish
+- Step 迭代限制：单步超 3 轮 → 自动标记 failed → LLM 收到反馈继续

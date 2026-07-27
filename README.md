@@ -6,7 +6,7 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 
 ## 项目状态
 
-✅ **跨平台路径处理完成** — 238 个测试通过。4 层协作模型（Prompt → Schema → Runtime PathNormalizer → JSON Recovery），LLM 生成平台无关路径，Runtime 负责 OS 适配和安全边界检查。
+✅ **Plan 工具完成** — 241 个测试通过。LLM 自主创建和更新计划（plan_create/plan_update），双层迭代计数器（全局 40 + 单步 12），PlanSection 注入上下文，PlanSection 渲染终端进度。
 
 ## 架构
 
