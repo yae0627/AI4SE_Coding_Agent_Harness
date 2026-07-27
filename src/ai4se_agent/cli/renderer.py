@@ -192,11 +192,13 @@ class TerminalRenderer(Renderer):
             _c(_DIM, f"  [{tool}] {params_summary}  ") + status
         )
 
-        if not success:
-            error_preview = event.payload.get("output_preview", "")
-            if error_preview:
-                for line in error_preview.splitlines()[:3]:
-                    self._print(_c(_RED, f"    {line[:self._max_output]}"))
+        # Show brief preview of tool output
+        preview = event.payload.get("output_preview", "")
+        if preview:
+            limit = 5 if not success else 3
+            color = _RED if not success else _DIM
+            for line in preview.splitlines()[:limit]:
+                self._print(_c(color, f"    | {line[:self._max_output]}"))
 
     def _on_llm_token(self, event: AgentEvent) -> None:
         token = event.payload.get("token", "")
