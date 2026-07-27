@@ -60,3 +60,42 @@ class CorrectionPlan:
     target_files: list
     strategy: str
     retry_count: int = 0
+
+
+@dataclass
+class PlanStep:
+    description: str
+    status: str = "pending"  # pending | in_progress | done | failed
+
+    def is_active(self) -> bool:
+        return self.status in ("pending", "in_progress")
+
+    def is_done(self) -> bool:
+        return self.status == "done"
+
+
+@dataclass
+class Plan:
+    steps: list  # list[PlanStep]
+
+    @staticmethod
+    def from_strings(descriptions: list[str]) -> "Plan":
+        return Plan(steps=[PlanStep(description=d) for d in descriptions])
+
+    def current_step(self) -> PlanStep | None:
+        for s in self.steps:
+            if s.status == "in_progress":
+                return s
+        for s in self.steps:
+            if s.status == "pending":
+                return s
+        return None
+
+    def completed(self) -> bool:
+        return all(s.status == "done" for s in self.steps)
+
+    def pending_count(self) -> int:
+        return sum(1 for s in self.steps if s.status == "pending")
+
+    def done_count(self) -> int:
+        return sum(1 for s in self.steps if s.status == "done")

@@ -4,7 +4,7 @@ from ai4se_agent.context.prompt_context import PromptContext
 from ai4se_agent.context.prompt_composer import PromptComposer
 from ai4se_agent.context.sections import (
     SystemRoleSection, ToolSection, FormatSection,
-    ExampleSection, WorkspaceSection, RulesSection,
+    ExampleSection, WorkspaceSection, RulesSection, PlanSection,
 )
 from ai4se_agent.context.workspace import WorkspaceCollector
 from ai4se_agent.core.action_schema import CONTROL_SCHEMAS
@@ -36,6 +36,7 @@ class ContextBuilder:
             ExampleSection(),
             WorkspaceSection(),
             RulesSection(),
+            PlanSection(),
         ])
 
     def build(self, state: AgentState) -> list[dict]:
@@ -47,6 +48,7 @@ class ContextBuilder:
             workspace=workspace,
             rules=rules,
             feedback=state.feedback,
+            plan=state.plan,
         )
         system_prompt = self._composer.compose(ctx)
 

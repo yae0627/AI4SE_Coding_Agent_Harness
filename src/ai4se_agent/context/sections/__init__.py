@@ -4,8 +4,10 @@ from ai4se_agent.context.sections.format_section import FormatSection
 from ai4se_agent.context.sections.example_section import ExampleSection
 from ai4se_agent.context.sections.workspace_section import WorkspaceSection
 from ai4se_agent.context.sections.rules_section import RulesSection
+from ai4se_agent.context.sections.plan_section import PlanSection
 
 __all__ = [
     "SystemRoleSection", "ToolSection", "FormatSection",
     "ExampleSection", "WorkspaceSection", "RulesSection",
+    "PlanSection",
 ]

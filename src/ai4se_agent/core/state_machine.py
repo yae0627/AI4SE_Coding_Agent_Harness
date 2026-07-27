@@ -20,7 +20,7 @@ from ai4se_agent.observability.tracer import NullTracer, Tracer
 from ai4se_agent.tools.registry import ToolRegistry
 from ai4se_agent.core.events import AgentEvent
 from ai4se_agent.core.interrupt import InterruptChannel
-from ai4se_agent.types import Action, GuardrailResult, StopReason, ToolResult
+from ai4se_agent.types import Action, GuardrailResult, Plan, StopReason, ToolResult
 
 if TYPE_CHECKING:
     from ai4se_agent.core.event_bus import EventBus
@@ -46,7 +46,8 @@ class HarnessStateMachine:
         guardrail_engine: GuardrailEngine,
         feedback_loop: FeedbackLoop | None,
         event_bus: "EventBus",
-        max_iterations: int = 20,
+        max_iterations: int = 40,
+        max_step_iterations: int = 12,
         tracer: Tracer = NullTracer(),
         persistent_memory: PersistentMemory | None = None,
         interactive: bool = True,
@@ -60,6 +61,7 @@ class HarnessStateMachine:
         self.guardrails = guardrail_engine
         self.feedback = feedback_loop
         self.max_iterations = max_iterations
+        self.max_step_iterations = max_step_iterations
         self.stop_reason = StopReason.SUCCESS
         self._pending_action: Optional[Action] = None
         self._pending_guardrail: Optional[GuardrailResult] = None
@@ -118,10 +120,24 @@ class HarnessStateMachine:
             self.stop()
             return
         self.state.increment_iteration()
+        # Global limit
         if self.state.iteration >= self.max_iterations:
             self.stop_reason = StopReason.MAX_ITERATION
             self.stop()
             return
+        # Per-step limit: if a plan step exceeds its budget, mark it
+        # failed and let the LLM re-plan instead of killing the whole task
+        if self.state.plan and self.state.step_iteration >= self.max_step_iterations:
+            current = self.state.plan.current_step()
+            if current:
+                current.status = "failed"
+                self.state.reset_step_iteration()
+                self.state.record_feedback(
+                    f"Step '{current.description}' exceeded iteration limit "
+                    f"({self.max_step_iterations}). Mark it as failed and continue "
+                    f"with the next step, or break it into smaller steps."
+                )
+                self._emit("PLAN_UPDATED", {"plan": self._plan_summary()})
         self.call_llm()
 
     def _on_llm_call(self) -> None:
@@ -177,6 +193,54 @@ class HarnessStateMachine:
             return
 
         action = result.action
+
+        # ── Plan actions ──────────────────────────────────────────
+        if action.name == "plan_create":
+            steps = action.parameters.get("steps", [])
+            if steps:
+                self.state.plan = Plan.from_strings(steps)
+                if steps:
+                    self.state.plan.steps[0].status = "in_progress"
+                self.state.reset_step_iteration()
+                self._emit("PLAN_UPDATED", {"plan": self._plan_summary()})
+                self.state.history.append({
+                    "role": "assistant", "content": f"Plan created: {len(steps)} steps",
+                    "type": "message"
+                })
+            self.retry_parse()
+            return
+
+        if action.name == "plan_update":
+            idx = action.parameters.get("step_index", 0)
+            status = action.parameters.get("status", "done")
+            if self.state.plan and 0 <= idx < len(self.state.plan.steps):
+                step = self.state.plan.steps[idx]
+                if status == "in_progress":
+                    # Reset step counter when starting a new step
+                    self.state.reset_step_iteration()
+                    for s in self.state.plan.steps:
+                        if s.status == "in_progress":
+                            s.status = "pending"
+                    step.status = "in_progress"
+                else:
+                    step.status = status
+                    if status == "done":
+                        self.state.reset_step_iteration()
+                        # Auto-start next pending step
+                        nxt = self.state.plan.current_step()
+                        if nxt:
+                            nxt.status = "in_progress"
+                            self.state.reset_step_iteration()
+                self._emit("PLAN_UPDATED", {"plan": self._plan_summary()})
+                # Check if all done
+                if self.state.plan.completed():
+                    self.state.history.append({
+                        "role": "assistant", "content": "All plan steps completed.",
+                        "type": "message"
+                    })
+            self.retry_parse()
+            return
+
         if action.name == "finish":
             self.stop_reason = StopReason.SUCCESS
             self.stop()
@@ -358,6 +422,15 @@ class HarnessStateMachine:
             state=self._fsm_state,
             payload=payload or {},
         ))
+
+    def _plan_summary(self) -> list[dict]:
+        """Build a human-readable plan summary for event payloads."""
+        if not self.state.plan:
+            return []
+        return [
+            {"description": s.description, "status": s.status}
+            for s in self.state.plan.steps
+        ]
 
     def _build_result(self) -> dict:
         return {

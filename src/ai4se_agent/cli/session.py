@@ -41,6 +41,7 @@ class SessionManager:
             bus.subscribe("AGENT_STOP", self._renderer._on_agent_stop)
             bus.subscribe("RESPOND", self._renderer._on_respond_event)
             bus.subscribe("LLM_MESSAGE", self._renderer._on_llm_message)
+            bus.subscribe("PLAN_UPDATED", self._renderer._on_plan_updated)
 
     def start(self) -> None:
         cfg = self._config.load()

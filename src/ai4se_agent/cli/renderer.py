@@ -126,6 +126,7 @@ class TerminalRenderer(Renderer):
             event_bus.subscribe("LLM_TOKEN", self._on_llm_token)
             event_bus.subscribe("LLM_END", self._on_llm_end)
             event_bus.subscribe("LLM_MESSAGE", self._on_llm_message)
+            event_bus.subscribe("PLAN_UPDATED", self._on_plan_updated)
             event_bus.subscribe("ACTION_CREATED", self._on_action_created)
             event_bus.subscribe("GUARDRAIL_PASS", self._on_guardrail_pass)
             event_bus.subscribe("GUARDRAIL_DENY", self._on_guardrail_deny)
@@ -240,6 +241,16 @@ class TerminalRenderer(Renderer):
                 self._print(_c(_DIM, "  ... ") + line)
             else:
                 self._print(f"       {line}")
+        self._print("")
+
+    def _on_plan_updated(self, event: AgentEvent) -> None:
+        steps = event.payload.get("plan", [])
+        if not steps:
+            return
+        markers = {"pending": ".", "in_progress": ">", "done": "x", "failed": "!"}
+        for s in steps:
+            m = markers.get(s["status"], "?")
+            self._print(_c(_DIM, f"  [{m}] {s['description']}"))
         self._print("")
 
     def _on_respond_event(self, event: AgentEvent) -> None:
