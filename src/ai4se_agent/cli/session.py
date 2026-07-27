@@ -1,3 +1,4 @@
+import shutil
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -44,7 +45,13 @@ class SessionManager:
     def start(self) -> None:
         cfg = self._config.load()
         model = cfg.model.active or "unknown"
-        print(f"ai4se-agent  {cfg.provider.name}:{model}")
+        provider = cfg.provider.name or "unknown"
+        w = min(shutil.get_terminal_size().columns, 60)
+        bar = "=" * w
+        print(bar)
+        print("  AI4SE Agent  v0.1.0")
+        print(f"  {provider} / {model}")
+        print(bar)
         print()
 
     def submit(self, task: str) -> dict:
@@ -115,6 +122,10 @@ class SessionManager:
                 if not handle_command(line, self):
                     break
                 continue
+
+            # Echo user input with visual distinction
+            print(f"\033[1;37m> {line}\033[0m")
+            print()
 
             ch = InterruptChannel()
             session._interrupt = ch

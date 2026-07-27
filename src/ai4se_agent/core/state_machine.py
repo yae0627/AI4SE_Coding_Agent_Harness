@@ -189,7 +189,6 @@ class HarnessStateMachine:
         if action.name == "respond":
             self._pending_action = action
             msg = action.parameters.get("message", "")
-            self._emit("LLM_MESSAGE", {"message": msg})
             self._emit("RESPOND", {"message": msg})
             self.state.history.append({
                 "role": "assistant", "content": msg, "type": "message"

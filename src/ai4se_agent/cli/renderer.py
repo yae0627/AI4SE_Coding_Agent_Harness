@@ -162,9 +162,11 @@ class TerminalRenderer(Renderer):
         pass
 
     def on_stop(self, reason: StopReason, iteration: int) -> None:
+        w = shutil.get_terminal_size().columns
+        self._print(_c(_DIM, "-" * min(w, 60)))
         self._print(_c(_DIM,
-            f"  stop: {reason.value} | {iteration} iters | "
-            f"{self._total_tokens} tokens | {self._total_elapsed_ms / 1000:.1f}s"
+            f"  done · {reason.value} · {iteration} iterations · "
+            f"{self._total_elapsed_ms / 1000:.1f}s"
         ))
 
     def on_token_usage(self, iteration: int, prompt_tokens: int, completion_tokens: int) -> None:
@@ -185,15 +187,11 @@ class TerminalRenderer(Renderer):
         success = event.payload.get("success", True)
         params_summary = _compact_params(self._tool_start_params)
 
-        # Compact tool line:  tool_name  params_summary  N.Ns ok/FAIL
-        tool_line = f"  {tool}  {params_summary}".ljust(50)
-        elapsed_str = f"{elapsed:.1f}s"
-        if success:
-            self._print(_c(_DIM, tool_line) + _c(_GREEN, f" {elapsed_str} ok"))
-        else:
-            self._print(_c(_DIM, tool_line) + _c(_RED, f" {elapsed_str} FAIL"))
+        status = _c(_GREEN, "ok") if success else _c(_RED, "FAIL")
+        self._print(
+            _c(_DIM, f"  [{tool}] {params_summary}  ") + status
+        )
 
-        # Show error details on failure
         if not success:
             error_preview = event.payload.get("output_preview", "")
             if error_preview:
@@ -235,8 +233,12 @@ class TerminalRenderer(Renderer):
         message = event.payload.get("message", "")
         if not message:
             return
-        for line in message.splitlines():
-            self._print(f"  {line}")
+        for i, line in enumerate(message.splitlines()):
+            if i == 0:
+                self._print(_c(_DIM, "  ... ") + line)
+            else:
+                self._print(f"       {line}")
+        self._print("")
 
     def _on_respond_event(self, event: AgentEvent) -> None:
         # Backward compat: old RESPOND events delegate to LLM_MESSAGE
@@ -268,7 +270,9 @@ class TerminalRenderer(Renderer):
     def _on_agent_stop(self, event: AgentEvent) -> None:
         reason = event.payload.get("reason", "unknown")
         iterations = event.payload.get("iterations", 0)
+        w = shutil.get_terminal_size().columns
+        self._print(_c(_DIM, "-" * min(w, 60)))
         self._print(_c(_DIM,
-            f"  stop: {reason} | {iterations} iters | "
-            f"{self._total_tokens} tokens | {self._total_elapsed_ms / 1000:.1f}s"
+            f"  done · {reason} · {iterations} iterations · "
+            f"{self._total_elapsed_ms / 1000:.1f}s"
         ))

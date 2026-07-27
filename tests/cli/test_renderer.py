@@ -43,13 +43,13 @@ def test_terminal_renderer_timing_verbose(capsys):
 
 def test_terminal_renderer_on_stop_with_summary(capsys):
     r = TerminalRenderer()
-    r._total_tokens = 700
     r._total_elapsed_ms = 5000.0
     r.on_stop(StopReason.SUCCESS, 3)
     captured = capsys.readouterr()
     assert "success" in captured.out
-    assert "700" in captured.out
+    assert "3 iterations" in captured.out
     assert "5.0s" in captured.out
+    assert "done" in captured.out
 
 
 def test_terminal_renderer_on_llm_call_verbose(capsys):
