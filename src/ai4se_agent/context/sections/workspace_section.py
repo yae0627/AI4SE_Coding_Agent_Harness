@@ -7,9 +7,15 @@ class WorkspaceSection(PromptSection):
         ws = ctx.workspace
         if ws is None:
             return ""
+        os_hint = {
+            "win32": "Windows (use cmd.exe or PowerShell, NOT bash/Unix commands)",
+            "linux": "Linux (use bash/sh commands)",
+            "darwin": "macOS (use bash/zsh commands)",
+        }.get(ws.os, ws.os)
+
         lines = [
             "## Environment",
-            f"  OS: {ws.os}",
+            f"  OS: {os_hint}",
             f"  Working directory: {ws.cwd}",
             f"  Git branch: {ws.git_branch}",
             f"  Time: {ws.timestamp}",

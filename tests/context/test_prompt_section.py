@@ -124,7 +124,7 @@ def test_workspace_section_shows_os():
     )
     ctx = PromptContext(tools=[], goal="", workspace=ws)
     result = section.build(ctx)
-    assert "linux" in result
+    assert "Linux (use bash/sh commands)" in result
     assert "/home/user/project" in result
     assert "main" in result
     assert "README.md" in result
