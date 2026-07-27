@@ -93,3 +93,4 @@
 | 2026-07-27 16:05 | #phase-comm-3.2 | subagent-driven | Phase 3.2: CONTROL_SCHEMAS 将 respond 替换为 ask，finish 移除 summary 参数。217/217 tests pass. | task 3.2 | 4a28c28 |
 | 2026-07-27 16:10 | #phase-comm-4.1 | subagent-driven | Phase 4.1: TerminalRenderer 新增 _on_llm_message 处理器（2 空格缩进 clean text），注册 LLM_MESSAGE 事件订阅，_on_respond_event 委托到新处理器。220/220 tests pass. | task 4.1 | 303b585 |
 | 2026-07-27 16:15 | #phase-comm-4.2 | subagent-driven | Phase 4.2: SessionManager._wire_renderer 订阅 LLM_MESSAGE 事件。220/220 tests pass. | task 4.2 | 3395248 |
+| 2026-07-27 16:30 | #phase-ui | chore | 提交 Terminal UI 组件：OutputBuffer + Viewport + TerminalUI alternate-screen 原型 + 交互式 demo 重构。13 个新测试。 | 清理之前 session 遗留的未跟踪文件，demo/ui_preview.py 重构为 threading 交互模型 | 6912cc2 |
