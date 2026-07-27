@@ -125,6 +125,7 @@ class TerminalRenderer(Renderer):
             event_bus.subscribe("TOOL_END", self._on_tool_end)
             event_bus.subscribe("LLM_TOKEN", self._on_llm_token)
             event_bus.subscribe("LLM_END", self._on_llm_end)
+            event_bus.subscribe("LLM_MESSAGE", self._on_llm_message)
             event_bus.subscribe("ACTION_CREATED", self._on_action_created)
             event_bus.subscribe("GUARDRAIL_PASS", self._on_guardrail_pass)
             event_bus.subscribe("GUARDRAIL_DENY", self._on_guardrail_deny)
@@ -230,10 +231,16 @@ class TerminalRenderer(Renderer):
     def _on_feedback_completed(self, event: AgentEvent) -> None:
         pass
 
-    def _on_respond_event(self, event: AgentEvent) -> None:
+    def _on_llm_message(self, event: AgentEvent) -> None:
         message = event.payload.get("message", "")
+        if not message:
+            return
         for line in message.splitlines():
             self._print(f"  {line}")
+
+    def _on_respond_event(self, event: AgentEvent) -> None:
+        # Backward compat: old RESPOND events delegate to LLM_MESSAGE
+        self._on_llm_message(event)
 
     def _on_approval_required(self, event: AgentEvent) -> None:
         policy = event.payload.get("policy", "unknown")

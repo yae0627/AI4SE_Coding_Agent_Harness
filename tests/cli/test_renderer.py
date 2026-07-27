@@ -187,6 +187,48 @@ def test_prompt_str_is_blue():
     assert ">" in p
 
 
+def test_renderer_llm_message_event(capsys):
+    r = TerminalRenderer()
+    event = AgentEvent(
+        type="LLM_MESSAGE", iteration=1, state="ACTION_PARSE",
+        payload={"message": "I will now analyze the codebase structure."},
+    )
+    r._on_llm_message(event)
+    captured = capsys.readouterr()
+    assert "analyze the codebase" in captured.out
+
+
+def test_renderer_llm_message_multiline(capsys):
+    r = TerminalRenderer()
+    event = AgentEvent(
+        type="LLM_MESSAGE", iteration=2, state="ACTION_PARSE",
+        payload={"message": "Found 3 issues:\n1. Missing import\n2. Typo in auth.py\n3. Unused variable"},
+    )
+    r._on_llm_message(event)
+    captured = capsys.readouterr()
+    assert "Missing import" in captured.out
+    assert "auth.py" in captured.out
+
+
+def test_renderer_subscribe_includes_llm_message():
+    from ai4se_agent.core.event_bus import EventBus
+    import io, sys
+    bus = EventBus()
+    r = TerminalRenderer(event_bus=bus)
+    captured = io.StringIO()
+    old_stdout = sys.stdout
+    sys.stdout = captured
+    try:
+        bus.publish(AgentEvent(
+            type="LLM_MESSAGE", iteration=1, state="ACTION_PARSE",
+            payload={"message": "test message"}
+        ))
+        output = captured.getvalue()
+        assert "test message" in output
+    finally:
+        sys.stdout = old_stdout
+
+
 def test_llm_token_streaming_output(capsys):
     r = TerminalRenderer()
     tokens = ['{"action":', ' "finish"', '}']
