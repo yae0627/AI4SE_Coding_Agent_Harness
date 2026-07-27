@@ -1,125 +1,130 @@
-"""Terminal UI preview for Phase 3 — run with: python demo/ui_preview.py
-
-Normal terminal mode: all output scrolls natively, no alternate screen.
+"""Terminal UI demo — single input loop, no nested polling, native scroll.
+python demo/ui_preview.py
 """
 import shutil
+import threading
 import time
 
+C = {
+    "reset": "\033[0m", "dim": "\033[2m",
+    "green": "\033[32m", "red": "\033[31m",
+    "yellow": "\033[33m", "blue": "\033[34m",
+    "white_b": "\033[1;37m",
+}
 
-def main():
-    width = shutil.get_terminal_size().columns
+def _c(color, text):
+    return f"{C.get(color, '')}{text}{C['reset']}"
 
-    C = {
-        "reset":     "\033[0m",
-        "bold":      "\033[1m",
-        "dim":       "\033[2m",
-        "green":     "\033[32m",
-        "red":       "\033[31m",
-        "yellow":    "\033[33m",
-        "cyan":      "\033[36m",
-        "blue":      "\033[34m",
-        "white_b":   "\033[1;37m",
-    }
+def p(line=""):
+    w = shutil.get_terminal_size().columns
+    print(line[:w - 1], flush=True)
 
-    def c(color, text):
-        return f"{C.get(color, '')}{text}{C['reset']}"
+# ── Shared state ───────────────────────────────────────────────
+stop_flag = threading.Event()
+approval: list[str] = []
+running = False
+turn = 0
 
-    def p(line=""):
-        print(line[:width - 1])
+def agent_loop(task: str):
+    global turn, running
+    turn += 1
+    stop_flag.clear()
 
-    def sep():
-        p(c("blue", "-" * min(width, 120)))
-
-    def prompt():
-        return c("blue", "> ")
-
-    # ── Banner ──────────────────────────────────────────────
-    p()
-    p(c("cyan", "  ai4se-agent") + c("dim", "  v0.2.0"))
-    p()
-    sep()
-
-    # ── User message ────────────────────────────────────────
-    p(c("white_b", "> add token expiry check to auth module"))
-    p()
-
-    # ── Agent responds ──────────────────────────────────────
-    time.sleep(0.5)
-    p("  I will check the current auth module implementation")
-    p("  and add token expiry validation to /refresh.")
-    p()
-    time.sleep(0.3)
-
-    # ── Tool: read_file (success) ───────────────────────────
-    p(c("dim", "  read_file  auth.py                  ") + c("green", "0.05s ok"))
-    p(c("dim", "    347 bytes | 3 endpoints"))
-    p()
+    time.sleep(0.4)
+    if stop_flag.is_set(): running = False; return
+    p(_c("blue", f"  Received task #{turn}: {task[:50]}"))
     time.sleep(0.2)
-
-    # ── Tool: pytest (success) ──────────────────────────────
-    p(c("dim", "  shell      pytest tests/auth/ -q     ") + c("green", "0.8s ok"))
-    p(c("dim", "    12 passed"))
-    p()
+    if stop_flag.is_set(): running = False; return
+    p(_c("dim", f"  read_file  README.md".ljust(50)) + _c("green", " 0.1s ok"))
     time.sleep(0.3)
+    if stop_flag.is_set(): running = False; return
+    p(_c("blue", "  This is a simulated agent response."))
+    time.sleep(0.2)
+    if stop_flag.is_set(): running = False; return
+    p(_c("dim", f"  shell  pytest tests/ -q".ljust(50)) + _c("green", " 1.2s ok"))
 
-    # ── Agent analysis ──────────────────────────────────────
-    p("  auth.py has 3 endpoints: /login, /refresh, /logout.")
-    p("  /refresh does not validate token exp field.")
-    p("  Adding JWT exp check with 401 on expired tokens.")
-    p()
-    time.sleep(0.3)
+    if turn % 3 == 0:
+        bar = "-" * min(shutil.get_terminal_size().columns - 4, 56)
+        p(_c("yellow", f"  {bar}"))
+        p(_c("yellow", "  ") + _c("white_b", "APPROVAL REQUIRED"))
+        p()
+        p("    Policy:  GitPolicy")
+        p("    Action:  git push origin main")
+        p("    Risk:    push to remote, irreversible")
+        p()
+        p(_c("yellow", "  /approve to confirm") + "  |  " + _c("yellow", "/reject to deny"))
+        p(_c("yellow", f"  {bar}"))
+        p()
+        while not stop_flag.is_set():
+            if approval:
+                resp = approval.pop(0)
+                p(_c("green", "  approved") if resp == "approve" else _c("red", "  rejected"))
+                break
+            time.sleep(0.1)
+        if stop_flag.is_set():
+            running = False
+            return
 
-    # ── Tool: pytest (failure) ──────────────────────────────
-    p(c("dim", "  shell      pytest tests/auth/ -q     ") + c("red", "2.1s FAIL"))
-    p(c("red", "    AssertionError: expected 401, got 200"))
-    p(c("red", "    test_refresh_expired_token:42"))
+    p(_c("dim", "  stop: success | 3 iters | 1.5s"))
     p()
-    p("  Test failed. Line 42 expected 401 but got 200.")
-    p("  The expired token is not being rejected.")
-    p()
-    time.sleep(0.3)
+    running = False
 
-    # ── Tool: edit + retest (success) ───────────────────────
-    p(c("dim", "  edit_file  auth.py:55-58             ") + c("green", "0.02s ok"))
-    p()
-    p(c("dim", "  shell      pytest tests/auth/ -q     ") + c("green", "0.6s ok"))
-    p(c("dim", "    15 passed"))
-    p()
-    p("  All tests pass. Token expiry check is now active")
-    p("  on /refresh endpoint.")
-    p()
-    time.sleep(0.3)
+# ── Banner ─────────────────────────────────────────────────────
+p()
+p(_c("blue", "  ai4se-agent") + _c("dim", "  interactive test"))
+p()
 
-    # ── HITL panel ──────────────────────────────────────────
-    p(c("dim", "  shell      git push origin main       ") + c("yellow", "HITL"))
-    p()
+# ── Main loop ──────────────────────────────────────────────────
+agent_thread: threading.Thread | None = None
 
-    bar_w = min(width - 4, 56)
-    bar = "-" * bar_w
-    p(c("yellow", f"  {bar}"))
-    p(c("yellow", "  ") + c("white_b", "APPROVAL REQUIRED"))
-    p()
-    p("    Policy:  GitPolicy")
-    p("    Action:  git push origin main")
-    p("    Risk:    push to remote, irreversible")
-    p()
-    p(c("yellow", "  /approve to confirm") + "  |  " + c("yellow", "/reject to deny"))
-    p(c("yellow", f"  {bar}"))
-    p()
-
-    # ── Input area ──────────────────────────────────────────
-    p()
-    sep()
-    sys_stdin = __import__("sys").stdin
+while True:
     try:
-        input(f"{prompt()}")
+        line = input().strip()
     except (EOFError, KeyboardInterrupt):
-        pass
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
+        if running:
+            stop_flag.set()
         print()
-        print("Preview finished.")
+        break
+
+    # Clean up finished agent thread
+    if agent_thread and not agent_thread.is_alive():
+        agent_thread.join()
+        agent_thread = None
+        running = False
+
+    # Agent running → interpret input as command
+    if running:
+        if line == "/stop":
+            stop_flag.set()
+            if agent_thread:
+                agent_thread.join(timeout=1)
+                agent_thread = None
+            running = False
+            p(_c("red", "  interrupted"))
+            p()
+        elif line == "/approve":
+            approval.append("approve")
+        elif line == "/reject":
+            approval.append("reject")
+        elif line in ("exit", "quit"):
+            stop_flag.set()
+            break
+        elif line:
+            p(_c("dim", "  Agent is running. /stop /approve /reject"))
+        continue
+
+    # Agent idle → new task
+    if not line:
+        continue
+    if line in ("exit", "quit"):
+        break
+
+    p()  # blank line between user input and agent output
+    running = True
+    approval.clear()
+    stop_flag.clear()
+    agent_thread = threading.Thread(target=agent_loop, args=(line,), daemon=True)
+    agent_thread.start()
+
+p()
+p(_c("dim", "Session ended."))
