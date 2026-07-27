@@ -71,6 +71,7 @@ class HarnessStateMachine:
         )
         self._tracer = tracer
         self._event_bus = event_bus
+        self._last_response = ""
         self._interactive = interactive
         self._interrupt = interrupt or InterruptChannel()
 
@@ -136,7 +137,7 @@ class HarnessStateMachine:
             self._tracer.record(
                 LLMEvent(self.state.iteration, model, messages, response)
             )
-            self.state.history.append({"role": "assistant", "content": response})
+            self._last_response = response
             self.parse_action()
         except Exception:
             self.state.error_count += 1
@@ -147,8 +148,7 @@ class HarnessStateMachine:
                 self.llm_error()
 
     def _on_action_parse(self) -> None:
-        last_msg = self.state.history[-1]["content"]
-        result = self.parser.parse(last_msg)
+        result = self.parser.parse(self._last_response)
         if not result.success:
             self.state.record_feedback(
                 f"Your last response could not be parsed as a valid action. "
@@ -160,16 +160,15 @@ class HarnessStateMachine:
             self.retry_parse()
             return
 
-        # Emit message if present (before action processing, so renderer shows it)
+        # Record message to history (narrative text, not raw JSON)
         if result.message:
             self._emit("LLM_MESSAGE", {"message": result.message})
+            self.state.history.append({
+                "role": "assistant", "content": result.message, "type": "message"
+            })
 
         # Message-only response (no action) — loop back for next LLM response
         if result.action is None:
-            self.state.history.append({
-                "role": "assistant", "content": result.message or "",
-                "type": "message"
-            })
             self.retry_parse()
             return
 
@@ -181,12 +180,20 @@ class HarnessStateMachine:
         if action.name == "ask":
             self._pending_action = action
             self._emit("LLM_MESSAGE", {"message": action.parameters.get("question", "")})
+            self.state.history.append({
+                "role": "assistant", "content": action.parameters.get("question", ""),
+                "type": "message"
+            })
             self.request_input()
             return
         if action.name == "respond":
             self._pending_action = action
-            self._emit("LLM_MESSAGE", {"message": action.parameters.get("message", "")})
-            self._emit("RESPOND", {"message": action.parameters.get("message", "")})
+            msg = action.parameters.get("message", "")
+            self._emit("LLM_MESSAGE", {"message": msg})
+            self._emit("RESPOND", {"message": msg})
+            self.state.history.append({
+                "role": "assistant", "content": msg, "type": "message"
+            })
             self.respond_to_user()
             return
         errors = self.validator.validate(action)
