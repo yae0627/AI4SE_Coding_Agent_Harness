@@ -22,6 +22,7 @@ class FormatSection(PromptSection):
             "Available action names are listed in Tools and Conversation sections above.\n\n"
             "Important rules:\n"
             "- Each response must contain at least one of 'message' or 'action'.\n"
+            "- For all file paths, always use forward slashes (/) as the directory separator.\n"
             "- For multi-line content, use \\n for newlines inside JSON strings.\n"
             "- All double quotes inside string values MUST be escaped with backslash: \\\"\n"
             "- Example of properly escaped code string:\n"

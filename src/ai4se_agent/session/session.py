@@ -45,7 +45,9 @@ class AgentRuntime:
 
         llm = self._llm.get_adapter()
 
-        tools = ToolRegistry()
+        from ai4se_agent.core.sanitizer.path import PathNormalizer
+        normalizer = PathNormalizer(workspace_root=".")
+        tools = ToolRegistry(path_normalizer=normalizer)
         tools.register(ReadFileTool())
         tools.register(WriteFileTool())
         tools.register(EditFileTool())

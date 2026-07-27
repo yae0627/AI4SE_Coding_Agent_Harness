@@ -81,6 +81,51 @@ class ActionParser:
         self._fallback = fallback
         self._legacy = LegacyActionParser()
 
+    def _repair_escapes(self, text: str) -> str | None:
+        """Fix invalid JSON escape sequences introduced by OS-specific syntax.
+
+        Example: ``C:\\Users\\test`` contains ``\\U`` which is not a valid JSON
+        escape.  Valid escapes are ``\" \\ \\/ \\b \\f \\n \\r \\t \\uXXXX``.
+        Any backslash followed by a character outside this set is treated as
+        a literal backslash by doubling it (``\\`` → ``\\\\``).
+
+        Uses a proper state machine: tracks *in_string* (inside a JSON string
+        value) and detects backslash + invalid-escape pairs, doubling the
+        backslash so json.loads sees a literal ``\\``.
+        """
+        _VALID = frozenset('"\\/bfnrtu')
+        result: list[str] = []
+        i = 0
+        in_string = False
+        fixed = False
+
+        while i < len(text):
+            ch = text[i]
+
+            if ch == '"':
+                in_string = not in_string
+                result.append(ch)
+                i += 1
+                continue
+
+            if ch == '\\' and in_string and i + 1 < len(text):
+                nxt = text[i + 1]
+                if nxt not in _VALID:
+                    result.append('\\\\')
+                    fixed = True
+                    i += 1
+                    continue
+                # valid escape — pass through unchanged
+                result.append(ch)
+                result.append(nxt)
+                i += 2
+                continue
+
+            result.append(ch)
+            i += 1
+
+        return ''.join(result) if fixed else None
+
     def _repair_json(self, text: str) -> str | None:
         """Fix unescaped double quotes inside JSON string values.
 
@@ -150,7 +195,18 @@ class ActionParser:
         try:
             obj = json.loads(text)
         except json.JSONDecodeError as e:
-            repaired = self._repair_json(text)
+            # Layer 4a: repair invalid escape sequences (e.g. Windows paths)
+            repaired = self._repair_escapes(text)
+            if repaired:
+                try:
+                    obj = json.loads(repaired)
+                except json.JSONDecodeError:
+                    repaired = None  # fall through to _repair_json
+
+            # Layer 4b: repair unescaped quotes inside strings
+            if repaired is None:
+                repaired = self._repair_json(text)
+
             if repaired:
                 try:
                     obj = json.loads(repaired)

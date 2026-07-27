@@ -14,7 +14,7 @@ class EditFileTool(Tool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path"},
+                    "path": {"type": "string", "description": "File path (use / not \\)", "format": "path"},
                     "old_string": {"type": "string", "description": "Text to replace"},
                     "new_string": {"type": "string", "description": "Replacement text"},
                 },

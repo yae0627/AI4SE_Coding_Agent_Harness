@@ -14,7 +14,7 @@ class WriteFileTool(Tool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path"},
+                    "path": {"type": "string", "description": "File path (use / not \\)", "format": "path"},
                     "content": {"type": "string", "description": "Content to write"},
                 },
                 "required": ["path", "content"],

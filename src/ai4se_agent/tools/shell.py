@@ -16,7 +16,7 @@ class ShellTool(Tool):
                 "properties": {
                     "command": {"type": "string", "description": "Shell command to execute"},
                     "timeout": {"type": "integer", "description": "Timeout in seconds"},
-                    "workdir": {"type": "string", "description": "Working directory"},
+                    "workdir": {"type": "string", "description": "Working directory (use / not \\)", "format": "path"},
                 },
                 "required": ["command"],
             },

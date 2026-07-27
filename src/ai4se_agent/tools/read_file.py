@@ -14,7 +14,7 @@ class ReadFileTool(Tool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path"},
+                    "path": {"type": "string", "description": "File path (use / not \\)", "format": "path"},
                 },
                 "required": ["path"],
             },
