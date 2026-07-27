@@ -80,8 +80,10 @@ class SessionManager:
         ch: InterruptChannel | None = None
 
         while True:
+            # ── Read input ────────────────────────────────────────
+            # Idle: show "> " prompt. Running: no prompt (yellow indicator is the cue).
             try:
-                line = input().strip()
+                line = input("> " if not self._agent_running else "").strip()
             except (EOFError, KeyboardInterrupt):
                 if self._agent_running and ch:
                     ch.request_stop()
@@ -95,14 +97,14 @@ class SessionManager:
                 print()
                 break
 
-            # Clean up finished agent
+            # ── Clean up finished agent ───────────────────────────
             if agent_thread and not agent_thread.is_alive():
                 agent_thread.join()
                 agent_thread = None
                 ch = None
                 self._agent_running = False
 
-            # Agent running → commands only
+            # ── Agent running → commands only ─────────────────────
             if self._agent_running:
                 if not ch:
                     continue
@@ -125,7 +127,7 @@ class SessionManager:
                     print()
                 continue
 
-            # Agent idle → new task or command
+            # ── Agent idle → new task or command ──────────────────
             if not line:
                 continue
             if line in ("exit", "quit"):
@@ -135,10 +137,7 @@ class SessionManager:
                     break
                 continue
 
-            # Echo user input with visual distinction
-            print(f"\033[1;37m> {line}\033[0m")
             print()
-
             ch = InterruptChannel()
             session._interrupt = ch
             self._agent_running = True
