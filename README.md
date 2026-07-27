@@ -6,7 +6,7 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 
 ## 项目状态
 
-✅ **Plan 工具完成** — 241 个测试通过。LLM 自主创建和更新计划（plan_create/plan_update），双层迭代计数器（全局 40 + 单步 12），PlanSection 注入上下文，PlanSection 渲染终端进度。
+✅ **Plan 工具完成** — 246 个测试通过。LLM 自主创建和更新计划（plan_create/plan_update），双层迭代计数器（全局40+单步12），/ 命令实时预览，跨平台路径处理。
 
 ## 架构
 
@@ -99,102 +99,57 @@ src/ai4se_agent/
 
 ## 快速开始
 
+### 安装
+
 ```bash
-# 安装依赖
+pip install ai4se-agent
+```
+
+或从源码安装：
+
+```bash
+git clone https://github.com/yae0627/AI4SE_Coding_Agent_Harness.git
+cd AI4SE_Coding_Agent_Harness/projects
 pip install -e ".[dev]"
+```
 
-# 首次运行 — 交互式配置引导
+### 配置 API Key
+
+```bash
+# 方式一：环境变量
+export OPENAI_API_KEY="sk-..."
+export OPENAI_BASE_URL="https://api.openai.com/v1"  # 可选
+export OPENAI_MODEL="gpt-4o"
+
+# 方式二：首次运行向导
 ai4se-agent --setup
-# 或直接启动交互模式（自动检测无配置时进入引导）
-ai4se-agent
+
+# 方式三：项目 .env 文件
+echo "OPENAI_API_KEY=sk-..." > .env
 ```
 
-### 配置管理
-
-配置存储在 `~/.config/ai4se/config.toml`（Linux/macOS）或 `%APPDATA%/ai4se/config.toml`（Windows），从任意目录运行均可加载。
-
-```toml
-[provider]
-name = "openai"
-api_key = "sk-..."
-base_url = "https://api.openai.com/v1"
-
-[model]
-active = "gpt-4o"
-
-[agent]
-max_iterations = 20
-```
-
-### 单次任务模式
+### 运行
 
 ```bash
-ai4se-agent "你的任务描述"
-ai4se-agent --verbose "你的任务描述"      # 详细输出
-ai4se-agent --trace "你的任务描述"        # 保存 JSON trace
+ai4se-agent                          # 交互模式
+ai4se-agent "your task description"  # 单次任务
+ai4se-agent --verbose "task"         # 详细输出
+ai4se-agent --trace "task"           # 保存 JSON trace
 ```
 
-### 交互式会话模式
+### 运行测试
 
 ```bash
-ai4se-agent    # 无参数启动交互模式
+pytest tests/ -v     # 246 个测试
 ```
 
-交互模式支持以下命令：
-
-| 命令 | 用途 |
-|------|------|
-| `你的任务描述` | 提交任务给 agent（跨轮次保留对话历史） |
-| `/config` | 查看当前配置 |
-| `/config set model active <name>` | 切换模型（即时生效） |
-| `/models` | 列出 API 可用模型 |
-| `/status` | 查看当前状态和迭代次数 |
-| `/verbose` | 切换详细输出模式 |
-| `/reset` | 清空当前会话 |
-| `exit` / `quit` | 退出交互模式 |
-
-### 输出示例
-
-```
-Workspace: C:\Users\...\AI4SE\projects
-Model: deepseek-v4-flash
-Provider: openai
-
-> write a Python script that prints Fibonacci(20)
-
-[CONTEXT_ORG] Iteration 1
-  action: write_file({'path': 'fibo.py', 'content': 'def fib(n):...'})
-  guardrail: all -> ALLOW
-  result: OK
-  feedback: success
-[CONTEXT_ORG] Iteration 2
-  action: shell({'command': 'python fibo.py'})
-  guardrail: all -> ALLOW
-  result: OK
-  feedback: success
-STOP: success | 2 iters | 0 tokens | 0.0s
-Result: success (success)
-```
-
-## 运行测试
-
-```bash
-pytest -v           # 162 个测试
-ruff check src/     # Lint 检查
-```
-
-## 机制演示
+### 机制演示
 
 ```bash
 python demo/mechanism_demo.py
 ```
 
-演示 5 个核心机制：
-1. 护栏拦截危险命令（`rm -rf /`）
-2. 反馈闭环检测失败并生成修正计划
-3. 增量修正策略（3 次失败后升级）
-4. FailureDB 持久化失败模式
-5. WorkspacePolicy 拦截路径逃逸
+演示 5 个核心机制：护栏拦截危险命令、反馈闭环检测失败、增量修正策略、FailureDB 持久化、WorkspacePolicy 路径拦截。
 
 ## 重点维度：反馈闭环
 
@@ -220,10 +175,19 @@ Sensor (TestSensor / LintSensor)
 
 ## 安全边界
 
-- API Key 通过 `~/.config/ai4se/config.toml` 存储
-- 危险命令拦截为代码机制（CommandPolicy），非 Prompt 约束
-- 文件操作限制在 workspace 内（WorkspacePolicy）
-- 路径逃逸检测（`../../` 写出 workspace 被拦截）
+- **API Key**：通过 `.env` 或系统环境变量加载，`.env` 在 `.gitignore` 中，永不提交 Git
+- **危险命令拦截**：代码级策略（CommandPolicy），非 Prompt 约束。`rm -rf /`、`dd`、`mkfs` 等危险命令在工具层被拦截
+- **路径沙箱**：PathNormalizer 在运行时校验路径不逃逸工作区
+- **Git 操作审批**：`git push`、`git reset --hard` 等高风险操作自动进入 HITL 审批状态
+- **首次运行**：检测无配置时自动进入 setup wizard，隐藏输入 API Key
+
+## 已知限制
+
+- **平台**：主要在 Windows 上开发和测试。Linux/macOS 兼容但未经充分测试
+- **Shell 命令**：交互模式下使用 cmd.exe（Windows）。Linux/macOS 需调整 SHELL 环境
+- **LLM 模型**：deepseek-v4-flash 在复杂多步任务上表现不稳定，建议使用 glm-5.2 或 deepseek-v4-pro
+- **终端**：/ 命令预览使用 ANSI 转义序列，需 Windows Terminal 或支持 VT100 的终端
+- **Python**：需要 Python 3.10+
 
 ## 技术栈
 

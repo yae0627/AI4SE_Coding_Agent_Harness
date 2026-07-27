@@ -853,3 +853,41 @@ Layer 4: JSON escape recovery（ActionParser._repair_escapes）
 - **241 测试全部通过**（+3 新增：plan create + step limit + no-plan fallback）
 - Mock 验证：LLM 创建 2 步计划 → 逐步标记完成 → 成功 finish
 - Step 迭代限制：单步超 3 轮 → 自动标记 failed → LLM 收到反馈继续
+
+## 阶段二十一：UX 打磨与 / 命令预览（2026-07-27）
+
+### 背景
+
+用户连续多轮交互测试发现大量 UI/UX 问题，逐个修复。
+
+### 修复列表
+
+| 问题 | 修复 |
+|------|------|
+| ExampleSection 用旧 respond 格式 | 更新为新 message+action 协议 |
+| agent 运行时误输入提示不佳 | 统一为黄色 ● Running 标识 |
+| Ctrl+C 后会话结束 | 区分"agent 运行时 Ctrl+C → 停止 agent 继续会话"和"空闲时 Ctrl+C → 退出" |
+| "你好"造成死循环 | message-only → stop（success），不再 retry_parse |
+| shell 命令 GBK 编码崩溃 | subprocess bytes 捕获 + errors='replace' |
+| tool error 不传给 LLM | record_turn 合并 error 到 observation |
+| 重试耗尽 → STOP | 改为 error→feedback → CONTEXT_ORG |
+| done 后无 > prompt | msvcrt.kbhit 轮询替代 input() 阻塞 |
+| 用户输入和回显重复 | input("> ") + overwrite 粗体 |
+| / 命令无提示 | msvcrt char-by-char 读取 + ANSI 实时重绘预览 |
+| 预览残留和光标漂移 | \033[J 全量重绘 + 光标归位 |
+
+## 阶段二十二：文档整合（2026-07-27）
+
+### 背景
+
+作业要求交付 SPEC.md、PLAN.md、REFLECTION.md 等文档。之前 spec 和 plan 分散在 11 个文件中，需要整合。
+
+### 产出
+
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| `SPEC.md` | 657 行 | 11 章节综合设计文档 |
+| `PLAN.md` | 486 行 | 20 阶段实现计划 |
+| `REFLECTION.md` | 更新 | 扩展至 Phase 16-20 |
+| `README.md` | 更新 | 新增快速开始、安全边界、已知限制 |
+| `mechanism_demo.py` | 修复 | params→parameters API 变更 |
