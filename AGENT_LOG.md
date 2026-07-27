@@ -94,3 +94,5 @@
 | 2026-07-27 16:10 | #phase-comm-4.1 | subagent-driven | Phase 4.1: TerminalRenderer 新增 _on_llm_message 处理器（2 空格缩进 clean text），注册 LLM_MESSAGE 事件订阅，_on_respond_event 委托到新处理器。220/220 tests pass. | task 4.1 | 303b585 |
 | 2026-07-27 16:15 | #phase-comm-4.2 | subagent-driven | Phase 4.2: SessionManager._wire_renderer 订阅 LLM_MESSAGE 事件。220/220 tests pass. | task 4.2 | 3395248 |
 | 2026-07-27 16:30 | #phase-ui | chore | 提交 Terminal UI 组件：OutputBuffer + Viewport + TerminalUI alternate-screen 原型 + 交互式 demo 重构。13 个新测试。 | 清理之前 session 遗留的未跟踪文件，demo/ui_preview.py 重构为 threading 交互模型 | 6912cc2 |
+| 2026-07-27 18:00 | #fix-03 | verification | Agent 行为验证：发现 StateHistory 中每轮产生 2 条重复 assistant 条目（原始 JSON + 格式化 action）。修复：_on_llm_call 不再写入原始 JSON，改为 _last_response 临时存储，_on_action_parse 写入有意义的 message 文本。238 tests pass. | 用户要求验证 agent 行为，通过 mock 观察事件流和 history 发现重复问题 | f19eea3 |
+| 2026-07-27 18:30 | #feat-cross-platform | brainstorming | 设计 4 层跨平台路径处理：L1 Prompt 约束 → L2 Schema 限制 → L3 Runtime PathNormalizer（separator→absolute→sandbox）→ L4 JSON escape recovery（_repair_escapes 状态机）。18 个新测试。 | 用户推翻 JSON repair 补窟窿方案，设计 4 层协作模型；用户调整 P0=Runtime 为核心防线；用户指出状态机 toggle 误修问题 | 72ff0e0 |

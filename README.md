@@ -6,7 +6,7 @@ A **Coding Agent Harness** — an engineering system that wraps an LLM into a re
 
 ## 项目状态
 
-✅ **Communication Channel 升级完成** — 220 个测试通过。message+action 双通道协议，ConversationMemory 跨轮次记忆，ask/WAIT_INPUT 状态机，LLM_MESSAGE 事件驱动。
+✅ **跨平台路径处理完成** — 238 个测试通过。4 层协作模型（Prompt → Schema → Runtime PathNormalizer → JSON Recovery），LLM 生成平台无关路径，Runtime 负责 OS 适配和安全边界检查。
 
 ## 架构
 

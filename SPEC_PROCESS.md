@@ -693,3 +693,97 @@ Session = Message Store（完整消息流）
 
 - `docs/superpowers/plans/2026-07-27-communication-channel-plan.md` — 实现计划（10 Task）
 - 10 个 commit：`ddd703e` → `3395248`
+
+## 阶段十七：Agent 行为验证与 history 修复（2026-07-27）
+
+### 验证目的
+
+用户要求用 mock LLM 模拟真实场景（"分析当前项目"），观察 agent 的事件流和 StateHistory 行为。
+
+### 验证结果
+
+**事件流正确**：3 轮迭代（read_file → shell → finish），LLM_MESSAGE → ACTION_CREATED → TOOL_START → TOOL_END 顺序正确。
+
+**发现问题**：StateHistory 中每轮产生 2 条重复 assistant 条目。
+
+```
+[0] assistant  {"message": "...", "action": {...}}    ← _on_llm_call 写的原始 JSON
+[1] assistant  action: read_file {'path': '...'}       ← record_turn 写的格式化动作
+```
+
+**根因**：`_on_llm_call`（state_machine.py:137）和 `AgentState.record_turn`（agent_state.py:20）各写入一条 assistant 记录。原始 JSON 对 LLM 无意义（LLM 不需要看自己的原始输出），造成 history 膨胀和 token 浪费。
+
+### 修复
+
+| 修改前 | 修改后 |
+|--------|--------|
+| `_on_llm_call` 写入 `state.history.append({"role": "assistant", "content": response})` | `self._last_response = response`（临时存储） |
+| `_on_action_parse` 读 `history[-1]["content"]` | 读 `self._last_response` |
+| 无 message history 入口 | `_on_action_parse` 写入 `{"role": "assistant", "type": "message", "content": msg}` |
+
+修复后每轮 history 从 2 条 assistant 变为 1 条 message + 1 条 action（来自 record_turn），原始 JSON 彻底移除。
+
+### 验证结果
+
+- **238 测试全部通过**
+- 修复后 `type=message` 条目正确标记
+- 原始 JSON 不再出现在 history 中
+
+## 阶段十八：跨平台路径处理（2026-07-27）
+
+### 问题
+
+LLM 在 Windows 环境下生成 `C:\Users\...` 路径时，JSON 中的 `\U`、`\A`、`\D` 是无效转义序列，`json.loads` 直接拒绝。
+
+### 根因分析（用户主导）
+
+用户指出本质不是 JSON 格式问题，而是 **LLM 被要求同时处理业务意图和操作系统细节**。路径中的反斜杠是 OS 语法，不应由 LLM 负责。正确的设计是 LLM 生成平台无关的抽象路径，Runtime 决定如何运行。
+
+### 架构决策
+
+| 决策点 | 选择 | 理由 |
+|--------|------|------|
+| 核心防线 | P0: Runtime PathNormalizer | LLM 输出永不可信，工具执行层必须兜底 |
+| PathNormalizer 位置 | ToolRegistry.execute() 注入 | 工具执行前透明转换，各工具无需修改 |
+| JSON repair | _repair_escapes → _repair_json 链式调用 | 先修转义序列，再修引号，不互相干扰 |
+| _repair_escapes 实现 | 真正状态机（in_string + 逐字符判断 valid_escapes） | 用户指出 toggle 方式会误修 `\"` |
+| 目录命名 | `core/sanitizer/path.py` | 不是 tool，属于 Agent Runtime Guard |
+
+### 4 层协作模型
+
+```
+Layer 1: Prompt（FormatSection +1 行）
+  "always use / for file paths"
+  预防大部分问题
+
+Layer 2: Schema（工具 schema path 字段 + format: "path"）
+  LLM 生成参数时再确认
+
+Layer 3: Runtime PathNormalizer（core/sanitizer/path.py）
+  核心防线：separator normalize → relative→absolute → workspace sandbox
+  通过 ToolRegistry.execute() 注入，对工具透明
+
+Layer 4: JSON escape recovery（ActionParser._repair_escapes）
+  最后兜底：修复无效转义序列后重试 json.loads
+  使用状态机，不误修 " \n \t \\ 等合法 escape
+```
+
+### 实现
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `core/sanitizer/path.py` | 新建 | PathNormalizer（~35 行） |
+| `core/sanitizer/__init__.py` | 新建 | 空 |
+| `tools/registry.py` | 重写 | execute() 注入 normalize；schema `format: path` 标记驱动 |
+| `tools/read_file.py` 等 4 个 | 修改 | path/workdir 加 `"format": "path"` + description |
+| `context/sections/format_section.py` | +1 行 | path 规则 |
+| `core/action.py` | +35 行 | _repair_escapes 状态机 + 调用链 |
+| `session/session.py` | +2 行 | 创建 PathNormalizer 注入 ToolRegistry |
+
+### 验证结果
+
+- **238 测试全部通过**（+18 新增：PathNormalizer 7 + JSON repair 7 + registry 4）
+- Windows backslash path → JSON parse success → normalized to workspace
+- Path escape (`../../etc/passwd`) → ValueError
+- Valid escapes (`\n`, `\t`, `\"`) not modified
+- `_repair_escapes` + `_repair_json` chain working correctly
