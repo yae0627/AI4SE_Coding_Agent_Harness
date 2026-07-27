@@ -79,11 +79,44 @@ class SessionManager:
         agent_thread: threading.Thread | None = None
         ch: InterruptChannel | None = None
 
+        def _read_running(current_thread) -> str:
+            """Poll keyboard during agent execution. Returns immediately
+            when the agent finishes, so the > prompt appears without
+            requiring the user to press Enter."""
+            try:
+                import msvcrt
+            except ImportError:
+                return input().strip()
+            chars: list[str] = []
+            while current_thread and current_thread.is_alive():
+                if msvcrt.kbhit():
+                    ch = msvcrt.getwch()
+                    if ch in ("\r", "\n"):
+                        print()
+                        return "".join(chars).strip()
+                    elif ch == "\x08":
+                        if chars:
+                            chars.pop()
+                            print("\b \b", end="", flush=True)
+                    elif ch == "\x03":
+                        raise KeyboardInterrupt
+                    elif ch.isprintable():
+                        chars.append(ch)
+                        print(ch, end="", flush=True)
+                else:
+                    import time as _time
+                    _time.sleep(0.1)
+            return "".join(chars).strip()
+
         while True:
             # ── Read input ────────────────────────────────────────
-            # Idle: show "> " prompt. Running: no prompt (yellow indicator is the cue).
+            # Idle: blocking input("> ") with prompt.
+            # Running: poll keyboard, return on Enter or agent finish.
             try:
-                line = input("> " if not self._agent_running else "").strip()
+                if self._agent_running:
+                    line = _read_running(agent_thread)
+                else:
+                    line = input("> ").strip()
             except (EOFError, KeyboardInterrupt):
                 if self._agent_running and ch:
                     ch.request_stop()
