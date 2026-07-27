@@ -180,3 +180,47 @@ def test_valid_json_still_works():
     result = parser.parse(text)
     assert result.success is True
     assert result.action.parameters["command"] == "ls -la"
+
+
+def test_parse_message_with_action():
+    parser = ActionParser()
+    text = '{"message": "I will now read the file.", "action": {"name": "read_file", "parameters": {"path": "test.txt"}}}'
+    result = parser.parse(text)
+    assert result.success is True
+    assert result.message == "I will now read the file."
+    assert result.action.name == "read_file"
+    assert result.action.parameters["path"] == "test.txt"
+
+
+def test_parse_action_only_no_message():
+    parser = ActionParser()
+    text = '{"action": {"name": "shell", "parameters": {"command": "ls"}}}'
+    result = parser.parse(text)
+    assert result.success is True
+    assert result.message is None
+    assert result.action.name == "shell"
+
+
+def test_parse_message_only_no_action():
+    parser = ActionParser()
+    text = '{"message": "Hello, how can I help?"}'
+    result = parser.parse(text)
+    assert result.success is True
+    assert result.message == "Hello, how can I help?"
+    assert result.action is None
+
+
+def test_parse_finish_with_message():
+    parser = ActionParser()
+    text = '{"message": "Analysis complete. Found 3 issues.", "action": {"name": "finish", "parameters": {}}}'
+    result = parser.parse(text)
+    assert result.success is True
+    assert result.message == "Analysis complete. Found 3 issues."
+    assert result.action.name == "finish"
+
+
+def test_parse_neither_message_nor_action():
+    parser = ActionParser()
+    text = '{"foo": "bar"}'
+    result = parser.parse(text)
+    assert result.success is False

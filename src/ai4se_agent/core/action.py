@@ -159,12 +159,30 @@ class ActionParser:
             else:
                 return ParseResult(success=False, error=f"Invalid JSON: {e}")
 
-        if "action" not in obj:
-            return ParseResult(success=False, error="Missing 'action' field in JSON")
-        return ParseResult(
-            success=True,
-            action=Action(name=obj["action"], parameters=obj.get("parameters", {}))
-        )
+        # Extract optional message
+        message = obj.get("message")
+
+        # Extract optional action
+        action = None
+        if "action" in obj:
+            action_obj = obj["action"]
+            if isinstance(action_obj, str):
+                # Old format: {"action": "tool_name", "parameters": {...}}
+                action = Action(
+                    name=action_obj,
+                    parameters=obj.get("parameters", {})
+                )
+            elif isinstance(action_obj, dict):
+                # New format: {"action": {"name": "tool_name", "parameters": {...}}}
+                action = Action(
+                    name=action_obj["name"],
+                    parameters=action_obj.get("parameters", {})
+                )
+
+        if message is None and action is None:
+            return ParseResult(success=False, error="Response must have 'message' and/or 'action' field")
+
+        return ParseResult(success=True, action=action, message=message)
 
     def parse(self, text: str) -> ParseResult:
         result = self._try_json(text)

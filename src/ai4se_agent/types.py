@@ -23,6 +23,7 @@ class Action:
 class ParseResult:
     success: bool
     action: Optional["Action"] = None
+    message: Optional[str] = None
     error: Optional[str] = None
 
 
