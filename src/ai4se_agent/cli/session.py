@@ -84,6 +84,13 @@ class SessionManager:
             except (EOFError, KeyboardInterrupt):
                 if self._agent_running and ch:
                     ch.request_stop()
+                    if agent_thread:
+                        agent_thread.join(timeout=5)
+                    agent_thread = None
+                    ch = None
+                    self._agent_running = False
+                    print()
+                    continue
                 print()
                 break
 
