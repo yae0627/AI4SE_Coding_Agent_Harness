@@ -252,7 +252,15 @@ class HarnessStateMachine:
         result = self.tools.execute(self._pending_action)
         self._last_tool_result = result
         self._emit("TOOL_END", {"tool": self._pending_action.name, "success": result.success, "output_preview": result.output[:500]})
-        self.state.record_turn(self._pending_action, result.output)
+        # Merge error into output so the LLM sees why the tool failed.
+        # Without this, a tool that catches an exception (output="") looks
+        # like a silent failure and the LLM just retries blindly.
+        observation = result.output
+        if not observation and result.error:
+            observation = f"ERROR: {result.error}"
+        elif result.error:
+            observation = f"{observation}\nERROR: {result.error}"
+        self.state.record_turn(self._pending_action, observation)
         self._tracer.record(
             ToolEvent(
                 self.state.iteration,
