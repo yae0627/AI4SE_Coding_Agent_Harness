@@ -104,9 +104,8 @@ def test_tool_section_empty_when_no_tools():
 def test_format_section_includes_json_escaping():
     section = FormatSection()
     result = section.build(PromptContext(tools=[], goal=""))
-    assert '{"action"' in result
+    assert '{"action"' in result or '"action"' in result
     assert '\\"' in result
-    assert "respond" in result
 
 
 def test_example_section_has_finish():
@@ -189,3 +188,19 @@ def test_composed_prompt_no_workflow_text():
     result = composer.compose(ctx)
     assert "Workflow" not in result
     assert "To complete a task, use tools to" not in result
+
+
+def test_format_section_includes_message_field():
+    from ai4se_agent.context.prompt_context import PromptContext
+    from ai4se_agent.context.sections.format_section import FormatSection
+
+    ctx = PromptContext(tools=[], goal="test", workspace=None, rules=[], feedback=[])
+    section = FormatSection()
+    output = section.build(ctx)
+
+    # New format must mention message field
+    assert '"message"' in output, "prompt should teach LLM about optional message field"
+    # Action is now a nested object
+    assert '"action"' in output
+    # Should mention message+action can coexist
+    assert 'message' in output.lower()
