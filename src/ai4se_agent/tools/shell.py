@@ -1,3 +1,4 @@
+import locale
 import subprocess
 import sys
 from ai4se_agent.tools.base import Tool
@@ -35,10 +36,15 @@ class ShellTool(Tool):
         workdir = params.get("workdir")
         try:
             result = subprocess.run(
-                command, shell=True, capture_output=True, text=True,
+                command, shell=True, capture_output=True,
                 timeout=timeout, cwd=workdir
             )
-            output = result.stdout + result.stderr
+            # Use system encoding with errors='replace' to survive
+            # mixed-encoding output (e.g. g++ warnings on Chinese Windows)
+            enc = locale.getpreferredencoding(do_setlocale=False)
+            stdout = result.stdout.decode(enc, errors="replace")
+            stderr = result.stderr.decode(enc, errors="replace")
+            output = stdout + stderr
             return ToolResult(
                 success=result.returncode == 0,
                 output=output.strip(),
