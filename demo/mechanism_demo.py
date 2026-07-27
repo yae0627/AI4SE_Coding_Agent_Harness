@@ -19,7 +19,7 @@ import os
 def demo_guardrail():
     print("=== Demo 1: Guardrail Intercepts Dangerous Action ===")
     policy = CommandPolicy()
-    action = Action(name="shell", params={"command": "rm -rf /"})
+    action = Action(name="shell", parameters={"command": "rm -rf /"})
     result = policy.check(action)
     assert result.verdict == "DENY", f"Expected DENY, got {result.verdict}"
     print("  Action: shell rm -rf /")
@@ -90,7 +90,7 @@ def demo_workspace_policy():
     print("=== Demo 5: WorkspacePolicy Blocks Path Escape ===")
     with tempfile.TemporaryDirectory() as tmp:
         policy = WorkspacePolicy(workspace=tmp)
-        action = Action(name="read_file", params={"path": os.path.join(tmp, "..", "..", "etc", "passwd")})
+        action = Action(name="read_file", parameters={"path": os.path.join(tmp, "..", "..", "etc", "passwd")})
         result = policy.check(action)
         assert result.verdict == "DENY"
         print("  Action: read_file ../../etc/passwd")
