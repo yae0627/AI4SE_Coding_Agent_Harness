@@ -93,24 +93,26 @@ class SessionManager:
             chars: list[str] = []
             max_w = shutil.get_terminal_size().columns
 
+            # Show initial prompt
+            sys.stdout.write("\033[1;37m> \033[0m")
+            sys.stdout.flush()
+
             def _redraw():
                 """Redraw input line + preview. Always ends with cursor
                 at the correct position on the input line."""
                 line = "".join(chars)
                 matches = matching_commands(line) if line.startswith("/") else []
-                # Clear and redraw from column 0
                 sys.stdout.write("\r\033[2K")
                 sys.stdout.write(f"\033[1;37m> {line}\033[0m")
                 sys.stdout.write("\033[J")
                 count = 0
                 if matches:
                     sys.stdout.write("\n")
-                    count += 1  # the blank separator line
+                    count += 1
                     for name, desc in matches:
                         entry = f"  \033[2m{name:<12s} {desc}\033[0m"
                         sys.stdout.write(entry[:max_w - 1] + "\n")
                         count += 1
-                # Move cursor back up to the input line
                 if count > 0:
                     sys.stdout.write(f"\033[{count}A")
                 sys.stdout.write(f"\r\033[{2 + len(line)}C")
@@ -119,10 +121,12 @@ class SessionManager:
             while True:
                 ch = msvcrt.getwch()
                 if ch in ("\r", "\n"):
-                    _redraw()
-                    sys.stdout.write("\n")
+                    # Clear preview, show final input line, and return
+                    line = "".join(chars)
+                    sys.stdout.write("\r\033[J")
+                    sys.stdout.write(f"\r\033[1;37m> {line}\033[0m\n")
                     sys.stdout.flush()
-                    return "".join(chars).strip()
+                    return line.strip()
                 if ch == "\x08":
                     if chars:
                         chars.pop()
