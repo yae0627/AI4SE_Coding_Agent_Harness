@@ -2,7 +2,6 @@ import json
 import uuid
 import datetime
 from pathlib import Path
-from ai4se_agent.session.history import ConversationMemory
 from ai4se_agent.memory.persistent import PersistentMemory
 
 
@@ -17,11 +16,9 @@ class MemoryManager:
 
     def __init__(
         self,
-        session: ConversationMemory | None = None,
         persistent: PersistentMemory | None = None,
         failure_log_dir: str | None = None,
     ):
-        self.session = session or ConversationMemory()
         self.persistent = persistent or PersistentMemory()
         self._failure_dir = Path(failure_log_dir) if failure_log_dir else None
 
