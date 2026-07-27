@@ -15,8 +15,8 @@ class ConversationMemory:
     def max_messages(self) -> int:
         return self._messages.maxlen
 
-    def append(self, role: str, content: str, metadata: dict | None = None) -> None:
-        msg: dict = {"role": role, "content": content}
+    def append(self, role: str, content: str, metadata: dict | None = None, type: str = "text") -> None:
+        msg: dict = {"role": role, "content": content, "type": type}
         if metadata:
             msg["metadata"] = metadata
         self._messages.append(msg)

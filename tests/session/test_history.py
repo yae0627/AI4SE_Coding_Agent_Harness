@@ -87,3 +87,24 @@ def test_sliding_window_evicts_oldest():
     assert len(messages) == 4
     assert messages[0]["content"] == "msg1"
     assert messages[-1]["content"] == "msg4"
+
+
+def test_append_typed_action_message():
+    mem = ConversationMemory()
+    mem.append("assistant", '{"action":"read_file","parameters":{"path":"x.txt"}}', type="action")
+    msg = mem.get_recent()[0]
+    assert msg["role"] == "assistant"
+    assert msg["type"] == "action"
+
+
+def test_append_typed_message():
+    mem = ConversationMemory()
+    mem.append("assistant", "I will read the file now.", type="message")
+    msg = mem.get_recent()[0]
+    assert msg["type"] == "message"
+
+
+def test_append_defaults_to_text():
+    mem = ConversationMemory()
+    mem.append("user", "hello")
+    assert mem.get_recent()[0].get("type") == "text"
