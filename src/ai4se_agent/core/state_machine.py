@@ -203,8 +203,11 @@ class HarnessStateMachine:
                     self.state.plan.steps[0].status = "in_progress"
                 self.state.reset_step_iteration()
                 self._emit("PLAN_UPDATED", {"plan": self._plan_summary()})
+                step0 = self.state.plan.steps[0].description
                 self.state.history.append({
-                    "role": "assistant", "content": f"Plan created: {len(steps)} steps",
+                    "role": "assistant",
+                    "content": f"Plan created with {len(steps)} steps. "
+                               f"Now execute step 1: {step0}",
                     "type": "message"
                 })
             self.retry_parse()

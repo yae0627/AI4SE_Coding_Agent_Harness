@@ -14,7 +14,15 @@ class PlanSection(PromptSection):
             m = markers.get(step.status, "[?]")
             lines.append(f"  {i+1}. {m} {step.description}")
         lines.append("")
-        lines.append("Use plan_update to mark steps as in_progress, done, or failed.")
-        if plan.completed():
+        current = plan.current_step()
+        if current and current.status == "in_progress":
+            lines.append(f"Current step: {current.description}")
+            lines.append("Execute this step using tool calls (write_file, shell, etc).")
+            lines.append("When done, call plan_update to mark it done.")
+        elif current and current.status == "pending":
+            lines.append("Call plan_update to start the first step, then execute it.")
+        elif plan.completed():
             lines.append("All steps completed — call finish to end the task.")
+        else:
+            lines.append("Use plan_update to mark steps as in_progress, done, or failed.")
         return "\n".join(lines)

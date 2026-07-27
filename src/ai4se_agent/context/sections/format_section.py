@@ -31,6 +31,10 @@ class FormatSection(PromptSection):
             '  {"message": "I found 3 potential issues in the codebase..."}\n\n'
             "- To finish the task, use the finish action:\n"
             '  {"message": "Task completed: all tests pass.", "action": {"name": "finish", "parameters": {}}}\n\n'
+            "- For complex multi-step tasks, use plan_create first:\n"
+            '  {"message": "Breaking into steps", "action": {"name": "plan_create", "parameters": {"steps": ["Step 1: ...", "Step 2: ..."]}}}\n'
+            "- After plan_create, immediately start executing the first step with tool calls.\n"
+            "- Use plan_update to mark progress: in_progress when starting, done when finished.\n"
             "- To ask the user a question (and wait for their response), use the ask action:\n"
             '  {"action": {"name": "ask", "parameters": {"question": "Which file should I modify?"}}}'
         )
