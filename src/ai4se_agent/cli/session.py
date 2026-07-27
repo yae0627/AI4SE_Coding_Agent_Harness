@@ -137,6 +137,8 @@ class SessionManager:
                     break
                 continue
 
+            # Overwrite terminal echo with bold version on the same line
+            print(f"\033[1A\033[2K\033[1;37m> {line}\033[0m")
             print()
             ch = InterruptChannel()
             session._interrupt = ch
