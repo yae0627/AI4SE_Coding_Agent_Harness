@@ -20,6 +20,7 @@ def test_redraw_output_contains_input_and_preview(capsys):
     count = 0
     if matches:
         sys.stdout.write("\n")
+        count += 1  # blank separator
         for name, desc in matches:
             entry = f"  \033[2m{name:<12s} {desc}\033[0m"
             sys.stdout.write(entry[:max_w - 1] + "\n")
@@ -50,6 +51,7 @@ def test_redraw_no_preview_for_plain_text(capsys):
     count = 0
     if matches:
         sys.stdout.write("\n")
+        count += 1
         for name, desc in matches:
             entry = f"  \033[2m{name:<12s} {desc}\033[0m"
             sys.stdout.write(entry[:100] + "\n")

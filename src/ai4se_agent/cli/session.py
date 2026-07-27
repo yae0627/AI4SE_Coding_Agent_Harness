@@ -105,11 +105,12 @@ class SessionManager:
                 count = 0
                 if matches:
                     sys.stdout.write("\n")
+                    count += 1  # the blank separator line
                     for name, desc in matches:
                         entry = f"  \033[2m{name:<12s} {desc}\033[0m"
                         sys.stdout.write(entry[:max_w - 1] + "\n")
                         count += 1
-                # Move cursor back to end of input line
+                # Move cursor back up to the input line
                 if count > 0:
                     sys.stdout.write(f"\033[{count}A")
                 sys.stdout.write(f"\r\033[{2 + len(line)}C")
