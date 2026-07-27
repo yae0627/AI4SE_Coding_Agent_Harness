@@ -81,7 +81,14 @@ class AgentRuntime:
             interrupt=interrupt,
         )
         result = machine.run()
+
+        # Sync full turn history back to ConversationMemory.
+        # Tag raw LLM responses as type="action" so downstream consumers
+        # can distinguish tool-call JSON from narrative messages.
         new_messages = self._state.history[history_start:]
+        for msg in new_messages:
+            if msg["role"] == "assistant" and "type" not in msg:
+                msg["type"] = "action"
         self._memory.extend(new_messages)
         return result
 

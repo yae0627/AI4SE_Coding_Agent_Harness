@@ -76,3 +76,25 @@ def test_agent_runtime_history_injected():
     )
     runtime.run()
     assert len(runtime._state.history) >= 2
+
+
+def test_conversation_memory_records_full_turn_history():
+    """After AgentRuntime.run(), ConversationMemory contains assistant messages, not a summary."""
+    bus = EventBus()
+    mem = ConversationMemory()
+    config = ConfigLoader()
+    config.set("provider", "name", "mock")
+
+    runtime = AgentRuntime(goal="read a file", memory=mem, config=config, event_bus=bus)
+    result = runtime.run()
+
+    messages = mem.get_all()
+    roles = [m["role"] for m in messages]
+
+    # Should have assistant and tool messages
+    assert "assistant" in roles, f"expected assistant in roles, got {roles}"
+    assert "tool" in roles, f"expected tool in roles, got {roles}"
+
+    # Should NOT be a lossy summary
+    contents = " ".join(str(m.get("content", "")) for m in messages)
+    assert "Task completed" not in contents, f"found lossy summary: {contents}"
