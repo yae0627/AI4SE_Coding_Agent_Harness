@@ -98,6 +98,7 @@ class HarnessStateMachine:
         self.machine.add_transition("tool_error", "TOOL_EXEC", "TOOL_ERROR", after="_on_tool_error")
         self.machine.add_transition("tool_success", "TOOL_EXEC", "FEEDBACK", after="_on_feedback")
         self.machine.add_transition("retry_tool", "TOOL_ERROR", "TOOL_EXEC", after="_on_tool_exec")
+        self.machine.add_transition("tool_feedback", "TOOL_ERROR", "CONTEXT_ORG", after="_on_context_org")
         self.machine.add_transition("feedback_done", "FEEDBACK", "MEMORY_UPDATE", after="_on_memory_update")
         self.machine.add_transition("feedback_correct", "FEEDBACK", "CONTEXT_ORG", after="_on_context_org")
         self.machine.add_transition("continue_loop", "MEMORY_UPDATE", "CONTEXT_ORG", after="_on_context_org")
@@ -275,12 +276,21 @@ class HarnessStateMachine:
             self.tool_error()
 
     def _on_tool_error(self) -> None:
-        if self.state.retry_count < 3:
+        if self.state.retry_count < 2:
             self.state.retry_count += 1
             self.retry_tool()
         else:
-            self.stop_reason = StopReason.REPEATED_FAILURE
-            self.stop()
+            # Retries exhausted — feed the error back to the LLM instead
+            # of stopping. The LLM sees the failure and can try a different
+            # approach (e.g. fix a command syntax error).
+            self.state.retry_count = 0
+            error_msg = "Tool execution failed"
+            if self._last_tool_result and self._last_tool_result.error:
+                error_msg = f"Tool execution failed: {self._last_tool_result.error}"
+            elif self._last_tool_result and self._last_tool_result.output:
+                error_msg = f"Tool execution failed. Output:\n{self._last_tool_result.output[:500]}"
+            self.state.record_feedback(error_msg)
+            self.tool_feedback()
 
     def _on_feedback(self) -> None:
         assert self._last_tool_result is not None
